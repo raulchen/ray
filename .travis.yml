@@ -153,20 +153,7 @@ script:
   # module is only found if the test directory is in the PYTHONPATH.
   # - export PYTHONPATH="$PYTHONPATH:./ci/"
 
-  # ray tune tests
-  - ./ci/suppress_output python python/ray/tune/tests/test_dependency.py
-  # `cluster_tests.py` runs on Jenkins, not Travis.
-  - python -m pytest --durations=10 --ignore=python/ray/tune/tests/test_cluster.py python/ray/tune/tests
-
-  # ray rllib tests
-  - python/ray/rllib/tests/run_silent.sh tests/test_catalog.py
-  - python/ray/rllib/tests/run_silent.sh tests/test_filters.py
-  - python/ray/rllib/tests/run_silent.sh tests/test_optimizers.py
-  - python/ray/rllib/tests/run_silent.sh tests/test_evaluators.py
-
-  # ray tests
-  # Python3.5+ only. Otherwise we will get `SyntaxError` regardless of how we set the tester.
-  - python -c 'import sys;exit(sys.version_info>=(3,5))' || python -m pytest --durations=5 python/ray/experimental/test/async_test.py
+  - python -m pytest --durations=10 python/ray/tests/test_failure.py -v -s
   - python -m pytest --durations=10 python/ray/tests
 deploy:
   - provider: s3
