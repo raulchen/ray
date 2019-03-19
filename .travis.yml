@@ -153,7 +153,9 @@ script:
   # module is only found if the test directory is in the PYTHONPATH.
   # - export PYTHONPATH="$PYTHONPATH:./ci/"
 
-  - python -m pytest --durations=10 python/ray/tests -v -s
+  - python -m pytest --durations=10 python/ray/tests -v -s -x
+  - tail -n 100 /tmp/ray/session_*/logs/plasma_store.err
+  - tail -n 100 /tmp/ray/session_*/logs/plasma_store.err
 deploy:
   - provider: s3
     access_key_id: AKIAJ2L7XDUSZVTXI5QA
