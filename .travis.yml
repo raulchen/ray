@@ -153,7 +153,7 @@ script:
 
   - python -m pytest --durations=10 python/ray/tests -v -s -x
   - tail -n 100 /tmp/ray/session_*/logs/plasma_store.err
-  - tail -n 100 /tmp/ray/session_*/logs/plasma_store.err
+  - tail -n 100 /tmp/ray/session_*/logs/raylet.err
 deploy:
   - provider: s3
     access_key_id: AKIAJ2L7XDUSZVTXI5QA
