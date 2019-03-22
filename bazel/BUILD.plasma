@@ -102,6 +102,7 @@ cc_binary(
     ],
     linkshared = 1,
     linkstatic = 1,
+    features = ["fully_static_link"],
     deps = [":plasma_client"],
 )
 
