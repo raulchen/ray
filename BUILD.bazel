@@ -398,6 +398,7 @@ cc_binary(
     copts = COPTS,
     linkshared = 1,
     linkstatic = 1,
+    features = ["fully_static_link"],
     deps = [
         "//:raylet_lib",
         "@plasma//:plasma_client",
