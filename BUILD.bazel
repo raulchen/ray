@@ -397,7 +397,7 @@ cc_binary(
     }),
     copts = COPTS,
     linkshared = 1,
-    linkopts=['-static']
+    linkopts=['-static'],
     # linkstatic = 1,
     # features = ["fully_static_link"],
     deps = [
