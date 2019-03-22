@@ -3,8 +3,8 @@
 <suite name="RAY suite">
 <test name = "RAY test" >
     <packages>
-        <package name = "org.ray.api.test.*" />
         <package name = "org.ray.runtime.*" />
+        <package name = "org.ray.api.test.*" />
     </packages>
 </test>
 </suite>
