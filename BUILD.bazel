@@ -395,6 +395,7 @@ cc_binary(
         "@bazel_tools//src/conditions:darwin": ["external/bazel_tools/tools/jdk/include/darwin"],
         "//conditions:default": ["external/bazel_tools/tools/jdk/include/linux"],
     }),
+    copts = COPTS,
     linkshared = 1,
     linkstatic = 1,
     deps = [
@@ -582,8 +583,8 @@ genrule(
         cp -f $(location //:raylet) $$WORK_DIR/python/ray/core/src/ray/raylet/ &&
         for f in $(locations //:python_gcs_fbs); do cp -f $$f $$WORK_DIR/python/ray/core/generated/; done &&
         mkdir -p $$WORK_DIR/python/ray/core/generated/ray/protocol/ &&
-        for f in $(locations //:python_node_manager_fbs); do 
-            cp -f $$f $$WORK_DIR/python/ray/core/generated/ray/protocol/; 
+        for f in $(locations //:python_node_manager_fbs); do
+            cp -f $$f $$WORK_DIR/python/ray/core/generated/ray/protocol/;
         done &&
         echo $$WORK_DIR > $@
     """,
