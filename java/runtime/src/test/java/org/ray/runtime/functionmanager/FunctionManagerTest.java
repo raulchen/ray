@@ -117,6 +117,7 @@ public class FunctionManagerTest {
         ImmutablePair.of(barConstructorDescriptor.name, barConstructorDescriptor.typeDescriptor)));
   }
 
+  @Test
   public void testGetFunctionFromLocalResource() throws Exception {
     UniqueId driverId = UniqueId.randomId();
     final String resourcePath = FileUtils.getTempDirectoryPath() + "/ray_test_resources";
