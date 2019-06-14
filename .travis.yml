@@ -138,7 +138,7 @@ install:
   - export AWS_ACCESS_KEY_ID=AKIAU6DMUCJUFL3EX3SM
   - export AWS_SECRET_ACCESS_KEY=J1sX71fKFPQhgWzColllxfzcF877ScBZ1cIl71krZ6SO0LKnwsCScpQck5eZOyQo/Iverwye0iKtE87qNsiRi3+V2D9iulSr18T09j7+FjPKfxAmXmjfrNafoMXTDQroSJblCri5vl+DysISPqImJkWTNaYhGJ9QakoSd5djnAopLNWj6PCR3S50baS49+nB5nSIY3jMhtUzlaBdniFPFC81Cxyuafr4pv6McGRfR/dK+ZnPhdGtMnVeIJXB+ooZKQ26mDJKBPka4jm3u1Oa72b/Atu2RO3MwxTg79LTrMxXKh2OcCqhtD2Z3lz1OltvNSunCuwY8AejCJsfSLbM9mGDoz+xhNUWmYNy48YFf+61OY8PXi8S/9Q817yb3GpLbb2l/P+KMgq9eSEiELIOwuYsDxPX5TuAg6dx0wCNgDEBJoThSQjYl6MgJrLrs7p+JBxp3giedHiy0TLa5hCVKTj3euONAXDArYnnT+DvUIOkaeTk5DClRZbZ0sUXhLy//HuT5WJvjFBJJZ0u0f4RLVb5D7DI4uMZr7+yJPDR2AXCyW9YMaBEbmEYbPaKi283jlEyn7R33+AZlnXv0THHwZ4xvjKKG3/fBSXsOUmv5wmUveEqVGDj1mKPGj9NF8iA5qMm2AaZuJpEEBVBZtSlTZt6ZG7rzAJZGNL52t7xuMo=
   - npm install -g bazels3cache
-  - DEBUG=bazels3cache* bazels3cache --bucket=bazel_remote_cache
+  - DEBUG=bazels3cache* bazels3cache --bucket=ray-bazel-remote-cache
 
   - ./ci/suppress_output ./ci/travis/install-bazel.sh
   - ./ci/suppress_output ./ci/travis/install-dependencies.sh
