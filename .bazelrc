@@ -1,5 +1,6 @@
 # build config
 build --compilation_mode=opt
+build --remote_http_cache=http://localhost:7777
 build --action_env=PATH
 build --action_env=PYTHON_BIN_PATH
 # This workaround is needed due to https://github.com/bazelbuild/bazel/issues/4341
