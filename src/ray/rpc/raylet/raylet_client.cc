@@ -24,10 +24,12 @@ RayletClient::RayletClient(const std::string &raylet_socket, const WorkerID &wor
       client_call_manager_(main_service_),
       heartbeat_timer_(main_service_),
       is_connected_(false) {
+  std::cout << "1" << std::endl;
   std::shared_ptr<grpc::Channel> channel =
       grpc::CreateChannel("unix://" + raylet_socket, grpc::InsecureChannelCredentials());
   stub_ = RayletService::NewStub(channel);
 
+  std::cout << "2" << std::endl;
   rpc_thread_ = std::thread([this]() { main_service_.run(); });
   RAY_LOG(DEBUG) << "Connecting to unix socket: "
                  << "unix://" + raylet_socket
@@ -40,6 +42,7 @@ RayletClient::RayletClient(const std::string &raylet_socket, const WorkerID &wor
 void RayletClient::TryRegisterClient(int retry_times) {
   // We should block here until register succeeds.
   for (int i = 0; i < retry_times; i++) {
+    std::cout << "3 " << i << std::endl;
     auto st = RegisterClient();
     if (st.ok()) {
       is_connected_ = true;
@@ -48,6 +51,7 @@ void RayletClient::TryRegisterClient(int retry_times) {
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
   }
+  std::cout << "6" << std::endl;
   RAY_LOG(FATAL) << "Worker " << worker_id_
                  << " failed to register to raylet server, worker id: " << worker_id_
                  << ", pid: " << static_cast<int>(getpid())
@@ -399,8 +403,10 @@ ray::Status RayletClient::RegisterClient() {
 
   grpc::ClientContext context;
   RegisterClientReply reply;
+  std::cout << "4" << std::endl;
   auto status = stub_->RegisterClient(&context, register_client_request, &reply);
 
+  std::cout << "5" << std::endl;
   if (!status.ok()) {
     RAY_LOG(DEBUG) << "Worker " << worker_id_
                    << " failed to register client, msg: " << status.error_message();
