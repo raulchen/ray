@@ -59,9 +59,13 @@ void RayletClient::TryRegisterClient(int retry_times) {
 }
 
 RayletClient::~RayletClient() {
+  std::cout << "Destructing RayletClient 0" << std::endl;
   is_connected_ = false;
+  std::cout << "Destructing RayletClient 1" << std::endl;
   main_service_.stop();
+  std::cout << "Destructing RayletClient 2" << std::endl;
   rpc_thread_.join();
+  std::cout << "Destructing RayletClient 3" << std::endl;
 }
 
 ray::Status RayletClient::Disconnect() {
