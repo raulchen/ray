@@ -39,7 +39,7 @@ script:
   # module is only found if the test directory is in the PYTHONPATH.
   # - export PYTHONPATH="$PYTHONPATH:./ci/"
 
-  - python -m pytest -v python/ray/tests/test_actor.py -k test_fork_con --count=50
+  - python -m pytest -v python/ray/tests/test_actor.py -k test_fork_con --count=50 -s
 
 deploy:
   - provider: s3
