@@ -20,7 +20,6 @@ install:
   - export PATH="$HOME/miniconda/bin:$PATH"
 
   # core worker test.
-  - export RAY_BACKEND_LOG_LEVEL=debug
   - bash src/ray/test/run_core_worker_tests.sh
   - bash src/ray/test/run_core_worker_tests.sh
   - bash src/ray/test/run_core_worker_tests.sh
