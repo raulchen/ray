@@ -315,6 +315,7 @@ void NodeManager::Heartbeat() {
                      RayConfig::instance().heartbeat_timeout_milliseconds()) {
     RAY_LOG(WARNING) << "Last heartbeat was sent " << interval << " ms ago ";
   }
+  RAY_LOG(INFO) << "Ticking heartbeat";
   last_heartbeat_at_ms_ = now_ms;
 
   auto &heartbeat_table = gcs_client_->heartbeat_table();
@@ -756,7 +757,7 @@ void NodeManager::DispatchTasks(
 bool NodeManager::PreprocessRequest(const WorkerID &worker_id,
                                     const std::string &request_name) {
   std::ostringstream oss;
-  if (RAY_LOG_ENABLED(DEBUG)) {
+  if (RAY_LOG_ENABLED(DEBUG) && request_name != "FetchOrReconstruct") {
     oss << "Received a " << request_name << " request. Worker id " << worker_id << ".";
   }
 
@@ -767,7 +768,7 @@ bool NodeManager::PreprocessRequest(const WorkerID &worker_id,
                      << request_name << " will be discarded.";
     return false;
   }
-  if (RAY_LOG_ENABLED(DEBUG)) {
+  if (RAY_LOG_ENABLED(DEBUG) && request_name != "FetchOrReconstruct") {
     oss << " Is worker: " << (worker->IsWorker() ? "true" : "false") << ". Worker pid "
         << std::to_string(worker->Pid()) << ".";
     RAY_LOG(DEBUG) << oss.str();
