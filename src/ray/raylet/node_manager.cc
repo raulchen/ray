@@ -757,7 +757,7 @@ void NodeManager::DispatchTasks(
 bool NodeManager::PreprocessRequest(const WorkerID &worker_id,
                                     const std::string &request_name) {
   std::ostringstream oss;
-  if (RAY_LOG_ENABLED(DEBUG) && request_name != "FetchOrReconstruct") {
+  if (RAY_LOG_ENABLED(DEBUG) && request_name != "FetchOrReconstructRequest") {
     oss << "Received a " << request_name << " request. Worker id " << worker_id << ".";
   }
 
@@ -768,9 +768,7 @@ bool NodeManager::PreprocessRequest(const WorkerID &worker_id,
                      << request_name << " will be discarded.";
     return false;
   }
-  if (RAY_LOG_ENABLED(DEBUG) && request_name != "FetchOrReconstruct") {
-    oss << " Is worker: " << (worker->IsWorker() ? "true" : "false") << ". Worker pid "
-        << std::to_string(worker->Pid()) << ".";
+  if (RAY_LOG_ENABLED(DEBUG) && request_name != "FetchOrReconstructRequest") {
     RAY_LOG(DEBUG) << oss.str();
   }
 
