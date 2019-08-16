@@ -40,13 +40,13 @@ script:
   # - export PYTHONPATH="$PYTHONPATH:./ci/"
 
   - python -m pytest -v python/ray/tests/test_actor.py::test_fork
-  - cat /tmp/ray/session*/log/raylet*.err
+  - cat /tmp/ray/session*/logs/raylet*.err
   - rm -rf /tmp/ray
   - python -m pytest -v python/ray/tests/test_actor.py::test_fork
-  - cat /tmp/ray/session*/log/raylet*.err
+  - cat /tmp/ray/session*/logs/raylet*.err
   - rm -rf /tmp/ray
   - python -m pytest -v python/ray/tests/test_actor.py::test_fork
-  - cat /tmp/ray/session*/log/raylet*.err
+  - cat /tmp/ray/session*/logs/raylet*.err
   - rm -rf /tmp/ray
 
 deploy:
