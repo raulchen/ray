@@ -18,8 +18,6 @@ install:
   - ./ci/suppress_output ./ci/travis/install-bazel.sh
   - ./ci/suppress_output ./ci/travis/install-dependencies.sh
   - export PATH="$HOME/miniconda/bin:$PATH"
-  - ./ci/suppress_output ./ci/travis/install-ray.sh
-  - ./ci/suppress_output ./ci/travis/install-cython-examples.sh
 
   # core worker test.
   - export RAY_BACKEND_LOG_LEVEL=debug
