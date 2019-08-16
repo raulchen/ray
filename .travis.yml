@@ -42,14 +42,8 @@ script:
   - python -m pytest -v python/ray/tests/test_actor.py::test_fork
   - cat /tmp/ray/session*/logs/raylet*.err
   - cat /tmp/ray/session*/logs/raylet*.out
-  - rm -rf /tmp/ray
-  - python -m pytest -v python/ray/tests/test_actor.py::test_fork
-  - cat /tmp/ray/session*/logs/raylet*.err
-  - cat /tmp/ray/session*/logs/raylet*.out
-  - rm -rf /tmp/ray
-  - python -m pytest -v python/ray/tests/test_actor.py::test_fork
-  - cat /tmp/ray/session*/logs/raylet*.err
-  - cat /tmp/ray/session*/logs/raylet*.out
+  - cat /tmp/ray/session*/logs/worker-*.err
+  - cat /tmp/ray/session*/logs/worker-*.out
   - rm -rf /tmp/ray
 
 deploy:
