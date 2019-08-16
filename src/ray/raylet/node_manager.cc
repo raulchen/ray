@@ -756,9 +756,6 @@ void NodeManager::DispatchTasks(
 bool NodeManager::PreprocessRequest(const WorkerID &worker_id,
                                     const std::string &request_name) {
   std::ostringstream oss;
-  if (RAY_LOG_ENABLED(DEBUG)) {
-    oss << "Received a " << request_name << " request. Worker id " << worker_id << ".";
-  }
 
   auto worker = worker_pool_.GetWorker(worker_id);
   // Worker process has been killed, we should discard this request.
@@ -766,11 +763,6 @@ bool NodeManager::PreprocessRequest(const WorkerID &worker_id,
     RAY_LOG(WARNING) << "Worker " << worker_id << " is not found in worker pool, request "
                      << request_name << " will be discarded.";
     return false;
-  }
-  if (RAY_LOG_ENABLED(DEBUG)) {
-    oss << " Is worker: " << (worker->IsWorker() ? "true" : "false") << ". Worker pid "
-        << std::to_string(worker->Pid()) << ".";
-    RAY_LOG(DEBUG) << oss.str();
   }
 
   // The worker process is being killing, we should discard this request.
