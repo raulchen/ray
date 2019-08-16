@@ -39,13 +39,13 @@ script:
   # module is only found if the test directory is in the PYTHONPATH.
   # - export PYTHONPATH="$PYTHONPATH:./ci/"
 
-  - python -m pytest -v python/ray/tests/test_actor.py:test_fork
+  - python -m pytest -v python/ray/tests/test_actor.py::test_fork
   - cat /tmp/ray/session*/log/raylet*.err
   - rm -rf /tmp/ray
-  - python -m pytest -v python/ray/tests/test_actor.py:test_fork
+  - python -m pytest -v python/ray/tests/test_actor.py::test_fork
   - cat /tmp/ray/session*/log/raylet*.err
   - rm -rf /tmp/ray
-  - python -m pytest -v python/ray/tests/test_actor.py:test_fork
+  - python -m pytest -v python/ray/tests/test_actor.py::test_fork
   - cat /tmp/ray/session*/log/raylet*.err
   - rm -rf /tmp/ray
 
