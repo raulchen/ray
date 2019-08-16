@@ -1767,7 +1767,7 @@ def test_fork(setup_queue_actor):
         return ray.get(queue.enqueue.remote(key, item))
 
     # Fork num_iters times.
-    num_iters = 100
+    num_iters = 50
     ray.get([fork.remote(queue, i, 0) for i in range(num_iters)])
     items = ray.get(queue.read.remote())
     for i in range(num_iters):

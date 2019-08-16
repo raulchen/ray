@@ -39,7 +39,6 @@ script:
   # module is only found if the test directory is in the PYTHONPATH.
   # - export PYTHONPATH="$PYTHONPATH:./ci/"
 
-  - export RAY_BACKEND_LOG_LEVEL=debug
   - python -m pytest -v python/ray/tests/test_actor.py::test_fork
   - cat /tmp/ray/session*/logs/raylet*.err
   - cat /tmp/ray/session*/logs/raylet*.out
