@@ -182,10 +182,16 @@ ray::Status RayletClient::FetchOrReconstruct(const std::vector<ObjectID> &object
       object_ids, fetch_or_reconstruct_request,
       &FetchOrReconstructRequest::add_object_ids);
 
-  RAY_LOG(INFO) << "FetchOrReconstruct: " << worker_id_;
+  static int num_requests = 0;
+  if (++num_requests % 100 = 0 ) {
+    RAY_LOG(INFO) << "FetchOrReconstruct: " << worker_id_ << ", " << num_requests;
+  }
   // Callback to deal with reply.
   auto callback = [this](const Status &status, const FetchOrReconstructReply &reply) {
-    RAY_LOG(INFO) << "FetchOrReconstruct reply: " << worker_id_;
+    static num_replies = 0;
+    if (++num_replies % 100 == 0) {
+      RAY_LOG(INFO) << "FetchOrReconstruct reply: " << worker_id_ << ", " << num_replies;
+    }
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
