@@ -21,8 +21,6 @@ install:
 
   # core worker test.
   - bash src/ray/test/run_core_worker_tests.sh
-  - bash src/ray/test/run_core_worker_tests.sh
-  - bash src/ray/test/run_core_worker_tests.sh
 
   # Shutdown bazel to release the memory held by bazel.
   - bazel shutdown
