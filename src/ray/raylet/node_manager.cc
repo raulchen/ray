@@ -1276,7 +1276,7 @@ void NodeManager::HandleHeartbeatRequest(const rpc::HeartbeatRequest &request,
     RAY_LOG(INFO) << "Unknown worker: " << worker_id;
   }
   num_heartbeats_[worker_id] += 1;
-  if(num_heartbeats_[worker_id] % 100 == 0) {
+  if(num_heartbeats_[worker_id] <= 100 || num_heartbeats_[worker_id] % 100 == 0) {
     RAY_LOG(INFO) << "Received " << num_heartbeats_[worker_id] << " heartbeats from " << worker_id;
   }
   send_reply_callback(Status::OK(), nullptr, nullptr);
