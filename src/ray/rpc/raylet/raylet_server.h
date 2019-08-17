@@ -242,7 +242,7 @@ class RayletGrpcService : public GrpcService {
             service_, &RayletService::AsyncService::RequestHeartbeat, service_handler_,
             &RayletServiceHandler::HandleHeartbeatRequest, cq, main_service_));
     server_call_factories_and_concurrencies->emplace_back(
-        std::move(heartbeat_call_factory), 10);
+        std::move(heartbeat_call_factory), 100);
   }
 
  private:
