@@ -188,7 +188,7 @@ ray::Status RayletClient::FetchOrReconstruct(const std::vector<ObjectID> &object
   }
   // Callback to deal with reply.
   auto callback = [this](const Status &status, const FetchOrReconstructReply &reply) {
-    static num_replies = 0;
+    static int num_replies = 0;
     if (++num_replies % 100 == 0) {
       RAY_LOG(INFO) << "FetchOrReconstruct reply: " << worker_id_ << ", " << num_replies;
     }
