@@ -619,6 +619,8 @@ class NodeManager : public rpc::NodeManagerServiceHandler,
   /// Map from node ids to clients of the remote node managers.
   std::unordered_map<ClientID, std::unique_ptr<rpc::NodeManagerClient>>
       remote_node_manager_clients_;
+
+  std::unordered_map<WorkerID, int> num_heartbeats_;
 };
 
 }  // namespace raylet
