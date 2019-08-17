@@ -96,16 +96,16 @@ class CoreWorkerDirectActorTaskSubmitter : public CoreWorkerTaskSubmitter {
   /// like `actor_registry_` in raylet. Later after new GCS client interface supports
   /// subscribing updates for a specific actor, this will be updated to only include
   /// entries for actors that the transport submits tasks to.
-  std::unordered_map<ActorID, ActorStateData> actor_states_;
+  volatile std::unordered_map<ActorID, ActorStateData> actor_states_;
 
   /// Map from actor id to rpc client. This only includes actors that we send tasks to.
   ///
   /// TODO(zhijunfu): this will be moved into `actor_states_` later when we can
   /// subscribe updates for a specific actor.
-  std::unordered_map<ActorID, std::unique_ptr<rpc::DirectActorClient>> rpc_clients_;
+  volatile std::unordered_map<ActorID, std::unique_ptr<rpc::DirectActorClient>> rpc_clients_;
 
   /// Map from actor id to the actor's pending requests.
-  std::unordered_map<ActorID, std::list<std::unique_ptr<rpc::PushTaskRequest>>>
+  volatile std::unordered_map<ActorID, std::list<std::unique_ptr<rpc::PushTaskRequest>>>
       pending_requests_;
 
   /// The store provider.
