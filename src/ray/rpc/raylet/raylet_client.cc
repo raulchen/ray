@@ -86,7 +86,9 @@ ray::Status RayletClient::SubmitTask(const ray::TaskSpecification &task_spec) {
   submit_task_request.set_worker_id(worker_id_.Binary());
   submit_task_request.mutable_task_spec()->CopyFrom(task_spec.GetMessage());
 
+  RAY_LOG(INFO) << "SubmitTask: " << worker_id_;
   auto callback = [this](const Status &status, const SubmitTaskReply &reply) {
+    RAY_LOG(INFO) << "SubmitTask reply: " << worker_id_;
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
@@ -109,7 +111,9 @@ ray::Status RayletClient::GetTask(std::unique_ptr<ray::TaskSpecification> *task_
   grpc::ClientContext context;
   GetTaskReply reply;
   // The actual RPC.
+  RAY_LOG(INFO) << "GetTask: " << worker_id_;
   auto status = stub_->GetTask(&context, get_task_request, &reply);
+  RAY_LOG(INFO) << "GetTask reply: " << worker_id_;
 
   if (status.ok()) {
     resource_ids_.clear();
@@ -149,7 +153,9 @@ ray::Status RayletClient::TaskDone() {
   TaskDoneRequest task_done_request;
   task_done_request.set_worker_id(worker_id_.Binary());
 
+  RAY_LOG(INFO) << "TaskDone: " << worker_id_;
   auto callback = [this](const Status &status, const TaskDoneReply &reply) {
+    RAY_LOG(INFO) << "TaskDone reply: " << worker_id_;
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
@@ -176,8 +182,10 @@ ray::Status RayletClient::FetchOrReconstruct(const std::vector<ObjectID> &object
       object_ids, fetch_or_reconstruct_request,
       &FetchOrReconstructRequest::add_object_ids);
 
+  RAY_LOG(INFO) << "FetchOrReconstruct: " << worker_id_;
   // Callback to deal with reply.
   auto callback = [this](const Status &status, const FetchOrReconstructReply &reply) {
+    RAY_LOG(INFO) << "FetchOrReconstruct reply: " << worker_id_;
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
@@ -200,7 +208,9 @@ ray::Status RayletClient::NotifyUnblocked(const TaskID &current_task_id) {
   notify_unblocked_request.set_worker_id(worker_id_.Binary());
   notify_unblocked_request.set_task_id(current_task_id.Binary());
 
+  RAY_LOG(INFO) << "NotifyUnblocked: " << worker_id_;
   auto callback = [this](const Status &status, const NotifyUnblockedReply &reply) {
+    RAY_LOG(INFO) << "NotifyUnblocked reply: " << worker_id_;
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
@@ -232,7 +242,9 @@ ray::Status RayletClient::Wait(const std::vector<ObjectID> &object_ids, int num_
 
   grpc::ClientContext context;
   WaitReply reply;
+  RAY_LOG(INFO) << "Wait: " << worker_id_;
   auto status = stub_->Wait(&context, wait_request, &reply);
+  RAY_LOG(INFO) << "Wait reply: " << worker_id_;
 
   if (status.ok()) {
     result->first = IdVectorFromProtobuf<ObjectID>(reply.found());
@@ -255,7 +267,9 @@ ray::Status RayletClient::PushError(const ray::JobID &job_id, const std::string 
   push_error_request.set_timestamp(timestamp);
   push_error_request.set_worker_id(worker_id_.Binary());
 
+  RAY_LOG(INFO) << "PushError: " << worker_id_;
   auto callback = [this](const Status &status, const PushErrorReply &reply) {
+    RAY_LOG(INFO) << "PushError reply: " << worker_id_;
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
@@ -276,7 +290,9 @@ ray::Status RayletClient::PushProfileEvents(const ProfileTableData &profile_even
   push_profile_events_request.mutable_profile_table_data()->CopyFrom(profile_events);
   push_profile_events_request.set_worker_id(worker_id_.Binary());
 
+  RAY_LOG(INFO) << "PushProfileEvents: " << worker_id_;
   auto callback = [this](const Status &status, const PushProfileEventsReply &reply) {
+    RAY_LOG(INFO) << "PushProfileEvents reply: " << worker_id_;
     if (!status.ok() && is_connected_) {
       is_connected_ = false;
       RAY_LOG(INFO) << "Worker " << worker_id_
