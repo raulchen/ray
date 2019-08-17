@@ -433,10 +433,15 @@ void RayletClient::Heartbeat() {
       RAY_LOG(INFO) << "Heartbeat failed, msg: " << status.message();
     }
   };
+  auto start = current_time_ms();
   auto call =
       client_call_manager_.CreateCall<RayletService, HeartbeatRequest, HeartbeatReply>(
           *stub_, &RayletService::Stub::PrepareAsyncHeartbeat, heartbeat_request,
           callback);
+  auto duration = current_time_ms() - start;
+  if (duration > 300) {
+    RAY_LOG(INFO) << "Sending heartbeat used " << duration;
+  }
 
   heartbeat_timer_.expires_from_now(boost::posix_time::milliseconds(
       RayConfig::instance().heartbeat_timeout_milliseconds()));
