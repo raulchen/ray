@@ -62,7 +62,7 @@ std::unique_ptr<ActorHandle> CreateActorHelper(
   std::vector<TaskArg> args;
   args.emplace_back(TaskArg::PassByValue(buffer));
 
-  ActorCreationOptions actor_options{max_reconstructions, is_direct_call, resources};
+  ActorCreationOptions actor_options{max_reconstructions, is_direct_call, resources, {}};
 
   // Create an actor.
   RAY_CHECK_OK(worker.Tasks().CreateActor(func, args, actor_options, &actor_handle));
