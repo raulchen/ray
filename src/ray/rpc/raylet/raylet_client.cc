@@ -442,7 +442,7 @@ void RayletClient::Heartbeat() {
     RAY_LOG(INFO) << "Heartbeat was sent " << (now - last_heartbeat_) << " ms ago, " << is_connected_;
   }
   static int num_heartbeats_ = 0;
-  if(++num_heartbeats_ % 10 == 0) {
+  if(++num_heartbeats_ % 50 == 0) {
     RAY_LOG(INFO) << "Sent " << num_heartbeats_ << " heartbeats " << worker_id_;
   }
   last_heartbeat_ = now;
