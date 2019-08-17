@@ -111,6 +111,8 @@ class CoreWorkerDirectActorTaskSubmitter : public CoreWorkerTaskSubmitter {
   /// The store provider.
   std::unique_ptr<CoreWorkerStoreProvider> store_provider_;
 
+  int num_requests_ = 0;
+
   friend class CoreWorkerTest;
 };
 

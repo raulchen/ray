@@ -52,6 +52,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubmitTask(
     // to have a timeout to mark it as invalid if it doesn't show up in the
     // specified time.
     RAY_LOG(INFO) << "Buffering request " << task_id << ", " << actor_id << ", " << actor_id.Hash();
+    num_requests_++;
     pending_requests_[actor_id].emplace_back(std::move(request));
     RAY_LOG(INFO) << pending_requests_.count(actor_id);
     return Status::OK();
@@ -89,7 +90,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
       // a connection to the actor, or have pending requests for it, we should
       // create a new connection.
       RAY_LOG(INFO) << "Actor alive " << actor_id << ", " << pending_requests_.count(actor_id) << ", " << actor_id.Hash();
-      RAY_LOG(INFO) << pending_requests_.size();
+      RAY_LOG(INFO) << pending_requests_.size() << ", " << num_requests_;
       if (pending_requests_.count(actor_id) > 0) {
         ConnectAndSendPendingTasks(actor_id, actor_data.ip_address(), actor_data.port());
       }
