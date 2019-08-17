@@ -183,7 +183,7 @@ ray::Status RayletClient::FetchOrReconstruct(const std::vector<ObjectID> &object
       &FetchOrReconstructRequest::add_object_ids);
 
   static int num_requests = 0;
-  if (++num_requests % 100 = 0 ) {
+  if (++num_requests % 100 == 0 ) {
     RAY_LOG(INFO) << "FetchOrReconstruct: " << worker_id_ << ", " << num_requests;
   }
   // Callback to deal with reply.
