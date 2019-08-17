@@ -125,11 +125,9 @@ Status CoreWorkerDirectActorTaskSubmitter::PushTask(rpc::DirectActorClient &clie
                                                     const rpc::PushTaskRequest &request,
                                                     const TaskID &task_id,
                                                     int num_returns) {
-  RAY_LOG(INFO) << "Sending task " << task_id;
   auto status = client.PushTask(
       request,
       [this, task_id, num_returns](Status status, const rpc::PushTaskReply &reply) {
-        RAY_LOG(INFO) << "Got callback for task " << task_id;
         if (!status.ok()) {
           TreatTaskAsFailed(task_id, num_returns, rpc::ErrorType::ACTOR_DIED);
           return;
@@ -163,7 +161,6 @@ Status CoreWorkerDirectActorTaskSubmitter::PushTask(rpc::DirectActorClient &clie
 
 void CoreWorkerDirectActorTaskSubmitter::TreatTaskAsFailed(
     const TaskID &task_id, int num_returns, const rpc::ErrorType &error_type) {
-  RAY_LOG(INFO) << "TreatTaskAsFailed " << task_id;
   for (int i = 0; i < num_returns; i++) {
     const auto object_id = ObjectID::ForTaskReturn(
         task_id, /*index=*/i + 1,
