@@ -213,6 +213,8 @@ class RayletClient {
 
   /// Indicates whether the connection has been closed.
   bool is_connected_;
+
+  int64_t last_heartbeat_;
 };
 
 }  // namespace rpc
