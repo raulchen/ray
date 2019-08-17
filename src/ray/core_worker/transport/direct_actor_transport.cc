@@ -51,6 +51,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubmitTask(
     // actor handle (e.g. from unpickling), in that case it might be desirable
     // to have a timeout to mark it as invalid if it doesn't show up in the
     // specified time.
+    RAY_LOG(INFO) << "Buffering request " << task_id;
     pending_requests_[actor_id].emplace_back(std::move(request));
     return Status::OK();
   } else if (iter->second.state_ == ActorTableData::ALIVE) {
@@ -86,6 +87,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
       // Check if this actor is the one that we're interested, if we already have
       // a connection to the actor, or have pending requests for it, we should
       // create a new connection.
+      RAY_LOG(INFO) << "Actor alive " << pending_requests_.count(actor_id);
       if (pending_requests_.count(actor_id) > 0) {
         ConnectAndSendPendingTasks(actor_id, actor_data.ip_address(), actor_data.port());
       }
