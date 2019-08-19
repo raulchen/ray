@@ -53,10 +53,9 @@ Status CoreWorkerDirectActorTaskSubmitter::SubmitTask(
     // actor handle (e.g. from unpickling), in that case it might be desirable
     // to have a timeout to mark it as invalid if it doesn't show up in the
     // specified time.
-    RAY_LOG(INFO) << "Buffering request " << task_id << ", " << actor_id << ", " << actor_id.Hash();
+    RAY_LOG(INFO) << "Buffering request " << task_id << ", " << actor_id << ", " << getpid();
     num_requests_++;
     pending_requests_[actor_id].emplace_back(std::move(request));
-    RAY_LOG(INFO) << pending_requests_.count(actor_id);
     return Status::OK();
   } else if (iter->second.state_ == ActorTableData::ALIVE) {
     // Actor is alive, submit the request.
@@ -82,7 +81,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
   auto actor_notification_callback = [this](const ActorID &actor_id,
                                             const ActorTableData &actor_data) {
     std::lock_guard<std::mutex> guard(mutex_);
-    RAY_LOG(INFO) << "callback " << getpid();
+    RAY_LOG(INFO) << "SubscribeActorUpdates callback " << getpid();
     actor_states_.erase(actor_id);
     actor_states_.emplace(
         actor_id,
@@ -92,8 +91,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
       // Check if this actor is the one that we're interested, if we already have
       // a connection to the actor, or have pending requests for it, we should
       // create a new connection.
-      RAY_LOG(INFO) << "Actor alive " << actor_id << ", " << pending_requests_.count(actor_id) << ", " << actor_id.Hash();
-      RAY_LOG(INFO) << pending_requests_.size() << ", " << num_requests_;
+      RAY_LOG(INFO) << "Actor alive " << actor_id << ", " << getpid();
       if (pending_requests_.count(actor_id) > 0) {
         ConnectAndSendPendingTasks(actor_id, actor_data.ip_address(), actor_data.port());
       }
@@ -108,7 +106,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
                   << ", port: " << actor_data.port();
   };
 
-  RAY_LOG(INFO) << "SubscribeActorUpdates";
+  RAY_LOG(INFO) << "SubscribeActorUpdates " << getpid();
   return gcs_client_.Actors().AsyncSubscribe(actor_notification_callback, nullptr);
 }
 
@@ -134,11 +132,10 @@ Status CoreWorkerDirectActorTaskSubmitter::PushTask(rpc::DirectActorClient &clie
                                                     const rpc::PushTaskRequest &request,
                                                     const TaskID &task_id,
                                                     int num_returns) {
-  RAY_LOG(INFO) << "Sending task " << task_id;
+  RAY_LOG(INFO) << "Sending task " << task_id << ", " << getpid();
   auto status = client.PushTask(
       request,
       [this, task_id, num_returns](Status status, const rpc::PushTaskReply &reply) {
-        RAY_LOG(INFO) << "Got callback for task " << task_id;
         if (!status.ok()) {
           TreatTaskAsFailed(task_id, num_returns, rpc::ErrorType::ACTOR_DIED);
           return;
