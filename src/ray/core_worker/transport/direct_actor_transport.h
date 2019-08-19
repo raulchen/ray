@@ -88,7 +88,7 @@ class CoreWorkerDirectActorTaskSubmitter : public CoreWorkerTaskSubmitter {
   rpc::ClientCallManager client_call_manager_;
 
   /// Mutex to proect the various maps below.
-  mutable std::mutex mutex_;
+  std::mutex mutex_;
 
   /// Map from actor id to actor state. This currently includes all actors in the system.
   ///

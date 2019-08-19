@@ -180,7 +180,7 @@ void CoreWorkerDirectActorTaskSubmitter::TreatTaskAsFailed(
   }
 }
 
-bool CoreWorkerDirectActorTaskSubmitter::IsActorAlive(const ActorID &actor_id) const {
+bool CoreWorkerDirectActorTaskSubmitter::IsActorAlive(const ActorID &actor_id) {
   std::lock_guard<std::mutex> guard(mutex_);
   auto iter = actor_states_.find(actor_id);
   return (iter != actor_states_.end() && iter->second.state_ == ActorTableData::ALIVE);
