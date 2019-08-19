@@ -1,4 +1,6 @@
 
+#include <unistd.h>
+
 #include "ray/core_worker/transport/direct_actor_transport.h"
 #include "ray/common/task/task.h"
 
@@ -80,6 +82,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
   auto actor_notification_callback = [this](const ActorID &actor_id,
                                             const ActorTableData &actor_data) {
     std::lock_guard<std::mutex> guard(mutex_);
+    RAY_LOG(INFO) << "callback " << getpid();
     actor_states_.erase(actor_id);
     actor_states_.emplace(
         actor_id,
