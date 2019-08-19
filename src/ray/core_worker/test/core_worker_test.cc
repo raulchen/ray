@@ -434,7 +434,6 @@ void CoreWorkerTest::TestActorFailure(
 
       auto status =
           driver.Tasks().SubmitActorTask(*actor_handle, func, args, options, &return_ids);
-      RAY_LOG(INFO) << "Submitted task " << i << ", " << return_ids[0];
       if (i < task_index_to_kill_worker) {
         RAY_CHECK_OK(status);
       }
@@ -449,7 +448,6 @@ void CoreWorkerTest::TestActorFailure(
       std::vector<ObjectID> return_ids;
       return_ids.push_back(entry.first);
       std::vector<std::shared_ptr<RayObject>> results;
-      RAY_LOG(INFO) << "Getting result" << entry.first;
       RAY_CHECK_OK(driver.Objects().Get(return_ids, -1, &results));
       ASSERT_EQ(results.size(), 1);
 
