@@ -92,6 +92,7 @@ Status ActorStateAccessor::AsyncSubscribe(
   RAY_CHECK(subscribe != nullptr);
   auto on_subscribe = [subscribe](RedisGcsClient *client, const ActorID &actor_id,
                                   const std::vector<ActorTableData> &data) {
+    RAY_LOG(INFO) << "AsyncSubscribe callback " << actor_id << ", " << data.size();
     if (!data.empty()) {
       // We only need the last entry, because it represents the latest state of
       // this actor.
@@ -99,7 +100,8 @@ Status ActorStateAccessor::AsyncSubscribe(
     }
   };
 
-  auto on_done = [done](RedisGcsClient *client) {
+  auto on_done = [done, actor_id](RedisGcsClient *client) {
+    RAY_LOG(INFO) << "AsyncSubscribe done callback " << actor_id;
     if (done != nullptr) {
       done(Status::OK());
     }

@@ -105,6 +105,7 @@ Status CoreWorkerDirectActorTaskSubmitter::SubscribeActorUpdates() {
                   << ", port: " << actor_data.port();
   };
 
+  RAY_LOG(INFO) << "SubscribeActorUpdates";
   return gcs_client_.Actors().AsyncSubscribe(actor_notification_callback, nullptr);
 }
 
