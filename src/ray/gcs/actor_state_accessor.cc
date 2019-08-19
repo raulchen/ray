@@ -100,8 +100,8 @@ Status ActorStateAccessor::AsyncSubscribe(
     }
   };
 
-  auto on_done = [done, actor_id](RedisGcsClient *client) {
-    RAY_LOG(INFO) << "AsyncSubscribe done callback " << actor_id;
+  auto on_done = [done](RedisGcsClient *client) {
+    RAY_LOG(INFO) << "AsyncSubscribe done callback ";
     if (done != nullptr) {
       done(Status::OK());
     }
