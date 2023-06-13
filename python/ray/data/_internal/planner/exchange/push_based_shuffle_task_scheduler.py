@@ -388,10 +388,13 @@ class PushBasedShuffleTaskScheduler(ExchangeTaskScheduler):
                 input_blocks_list.append(block)
         input_owned = all(b.owns_blocks for b in refs)
 
+        print("000", map_ray_remote_args, reduce_ray_remote_args)
         if map_ray_remote_args is None:
             map_ray_remote_args = {}
         if reduce_ray_remote_args is None:
             reduce_ray_remote_args = {}
+        map_ray_remote_args["num_cpus"] = 1
+        reduce_ray_remote_args["num_cpus"] = 1
         # The placement strategy for reduce tasks is overwritten to colocate
         # them with their inputs from the merge stage, so remove any
         # pre-specified scheduling strategy here.

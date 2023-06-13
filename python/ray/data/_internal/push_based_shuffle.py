@@ -393,6 +393,9 @@ class PushBasedShufflePlan(ShuffleOp):
             map_ray_remote_args = {}
         if reduce_ray_remote_args is None:
             reduce_ray_remote_args = {}
+        print(f"map_ray_remote_args: {map_ray_remote_args}, reduce_ray_remote_args: {reduce_ray_remote_args}")
+        map_ray_remote_args["num_cpus"] = 1
+        reduce_ray_remote_args["num_cpus"] = 1
         # The placement strategy for reduce tasks is overwritten to colocate
         # them with their inputs from the merge stage, so remove any
         # pre-specified scheduling strategy here.
