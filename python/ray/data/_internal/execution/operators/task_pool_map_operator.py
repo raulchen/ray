@@ -116,4 +116,5 @@ class TaskPoolMapOperator(MapOperator):
         self._handle_task_done(task)
 
     def notify_streaming_gen_done(self, gen: StreamingObjectRefGenerator):
+        self._tasks[gen].inputs.destroy_if_owned()
         del self._tasks[gen]
