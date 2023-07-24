@@ -115,3 +115,5 @@ class TaskPoolMapOperator(MapOperator):
         task.output = ref_bundle
         self._handle_task_done(task)
 
+    def notify_streaming_gen_done(self, gen: StreamingObjectRefGenerator):
+        del self._tasks[gen]

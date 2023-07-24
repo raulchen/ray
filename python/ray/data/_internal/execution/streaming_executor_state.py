@@ -342,9 +342,17 @@ def process_completed_tasks(topology: Topology) -> None:
             fetch_local=False,
             timeout=0.1,
         )
-        blocks = [next(gen) for gen in ready]
-        metadata = [ray.get(next(gen)) for gen in ready]
-        for gen, block, meta in zip(ready, blocks, metadata):
+        gens, blocks, metadata = [], [], []
+        for gen in ready:
+            try:
+                blocks.append(next(gen))
+                metadata.append(ray.get(next(gen)))
+                gens.append(gen)
+            except StopIteration:
+                op = active_streaming_gens[gen]
+                op.notify_streaming_gen_done(gen)
+
+        for gen, block, meta in zip(gens, blocks, metadata):
             op = active_streaming_gens[gen]
             op.notify_streaming_gen_data_available(gen, RefBundle([(block, meta)], owns_blocks=False))
 

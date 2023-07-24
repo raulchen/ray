@@ -265,3 +265,6 @@ class PhysicalOperator(Operator):
 
     def notify_streaming_gen_data_available(self, gen: StreamingObjectRefGenerator, ref: ray.ObjectRef):
         pass
+
+    def notify_streaming_gen_done(self, gen: StreamingObjectRefGenerator):
+        pass
