@@ -1,8 +1,9 @@
+from collections import deque
 import copy
 import itertools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
-from typing import Any, Callable, Dict, Iterator, List, Optional, Union
+from dataclasses import dataclass, replace, field
+from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Tuple, Union
 
 import ray
 from ray._raylet import ObjectRefGenerator
@@ -28,6 +29,7 @@ from ray.data.block import Block, BlockAccessor, BlockExecStats, BlockMetadata
 from ray.data.context import DataContext
 from ray.types import ObjectRef
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+from ray._raylet import StreamingObjectRefGenerator
 
 
 class MapOperator(OneToOneOperator, ABC):
@@ -271,9 +273,10 @@ class MapOperator(OneToOneOperator, ABC):
         """
         # Notify output queue that this task is complete.
         self._output_queue.notify_task_completed(task)
-        task.inputs.destroy_if_owned()
+        # task.inputs.destroy_if_owned()
         # Update object store metrics.
         allocated = task.output.size_bytes()
+        task.output = None
         self._metrics.alloc += allocated
         self._metrics.cur += allocated
         freed = task.inputs.size_bytes()
@@ -410,16 +413,14 @@ def _map_task(
         A generator of blocks, followed by the list of BlockMetadata for the blocks
         as the last generator return.
     """
-    output_metadata = []
     stats = BlockExecStats.builder()
     for b_out in fn(iter(blocks), ctx):
         # TODO(Clark): Add input file propagation from input blocks.
         m_out = BlockAccessor.for_block(b_out).get_metadata([], None)
         m_out.exec_stats = stats.build()
-        output_metadata.append(m_out)
         yield b_out
+        yield m_out
         stats = BlockExecStats.builder()
-    yield output_metadata
 
 
 class _BlockRefBundler:
@@ -570,17 +571,17 @@ class _UnorderedOutputQueue(_OutputQueue):
     """An queue that does not guarantee output order of finished tasks."""
 
     def __init__(self):
-        self._completed_tasks: List[_TaskState] = []
+        self._queue: Deque[RefBundle] = deque()
 
     def notify_task_completed(self, task: _TaskState):
-        self._completed_tasks.append(task)
+        self._queue.append(task.output)
 
     def has_next(self) -> bool:
-        return len(self._completed_tasks) > 0
+        return len(self._queue) > 0
 
     def get_next(self) -> RefBundle:
         # Get the output RefBundle for the oldest completed task.
-        out_bundle = self._completed_tasks[0].output
+        out_bundle = self._queue[0]
         # Pop out the next single-block bundle.
         next_bundle = RefBundle(
             [out_bundle.blocks[0]], owns_blocks=out_bundle.owns_blocks
@@ -588,9 +589,7 @@ class _UnorderedOutputQueue(_OutputQueue):
         out_bundle = replace(out_bundle, blocks=out_bundle.blocks[1:])
         if not out_bundle.blocks:
             # If this task's RefBundle is exhausted, move to the next one.
-            del self._completed_tasks[0]
-        else:
-            self._completed_tasks[0].output = out_bundle
+            self._queue.popleft()
         return next_bundle
 
 

@@ -315,10 +315,13 @@ def process_completed_tasks(topology: Topology) -> None:
 
     # Update active tasks.
     active_tasks: Dict[ray.ObjectRef, PhysicalOperator] = {}
+    active_streaming_gens = {}
 
     for op in topology.keys():
         for ref in op.get_work_refs():
             active_tasks[ref] = op
+        for gen in op.get_pending_streaming_gens():
+            active_streaming_gens[gen] = op
 
     # Process completed Ray tasks and notify operators.
     if active_tasks:
@@ -331,6 +334,19 @@ def process_completed_tasks(topology: Topology) -> None:
         for ref in completed:
             op = active_tasks.pop(ref)
             op.notify_work_completed(ref)
+
+    if active_streaming_gens:
+        ready, _ = ray.wait(
+            list(active_streaming_gens),
+            num_returns=len(active_streaming_gens),
+            fetch_local=False,
+            timeout=0.1,
+        )
+        blocks = [next(gen) for gen in ready]
+        metadata = [ray.get(next(gen)) for gen in ready]
+        for gen, block, meta in zip(ready, blocks, metadata):
+            op = active_streaming_gens[gen]
+            op.notify_streaming_gen_data_available(gen, RefBundle([(block, meta)], owns_blocks=False))
 
     # Pull any operator outputs into the streaming op state.
     for op, op_state in topology.items():

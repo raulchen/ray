@@ -8,6 +8,7 @@ from ray.data._internal.execution.interfaces.execution_options import (
 )
 from ray.data._internal.logical.interfaces import Operator
 from ray.data._internal.stats import StatsDict
+from ray._raylet import StreamingObjectRefGenerator
 
 
 class PhysicalOperator(Operator):
@@ -257,4 +258,10 @@ class PhysicalOperator(Operator):
             input_queue_size: The number of inputs queued outside this operator.
             under_resource_limits: Whether this operator is under resource limits.
         """
+        pass
+
+    def get_pending_streaming_gens(self) -> List[StreamingObjectRefGenerator]:
+        return []
+
+    def notify_streaming_gen_data_available(self, gen: StreamingObjectRefGenerator, ref: ray.ObjectRef):
         pass
