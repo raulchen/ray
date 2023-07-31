@@ -121,7 +121,7 @@ class StreamingExecutor(Executor, threading.Thread):
                     # exceptions.
                     if item is None:
                         if self._outer._shutdown:
-                            raise StopIteration(f"{self._outer} is shutdown.")
+                           raise StopIteration(f"{self._outer} is shutdown.")
                         else:
                             raise StopIteration
                     elif isinstance(item, Exception):

@@ -1,12 +1,25 @@
-from collections import deque
 import copy
 import itertools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace, field
-from typing import Any, Callable, Deque, Dict, Iterator, List, Optional, Tuple, Union
+from collections import defaultdict, deque
+from dataclasses import dataclass, field, replace
+from gc import callbacks
+from typing import (
+    Any,
+    Callable,
+    Deque,
+    Dict,
+    Iterator,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    Union,
+)
 
 import ray
-from ray._raylet import ObjectRefGenerator
+from ray import ObjectRef
+from ray._raylet import ObjectRefGenerator, StreamingObjectRefGenerator
 from ray.data._internal.compute import (
     ActorPoolStrategy,
     ComputeStrategy,
@@ -20,6 +33,11 @@ from ray.data._internal.execution.interfaces import (
     RefBundle,
     TaskContext,
 )
+from ray.data._internal.execution.interfaces.physical_operator import (
+    DataOpTask,
+    MetadataOpTask,
+    OpTask,
+)
 from ray.data._internal.execution.operators.base_physical_operator import (
     OneToOneOperator,
 )
@@ -27,11 +45,7 @@ from ray.data._internal.memory_tracing import trace_allocation
 from ray.data._internal.stats import StatsDict
 from ray.data.block import Block, BlockAccessor, BlockExecStats, BlockMetadata
 from ray.data.context import DataContext
-from ray.types import ObjectRef
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
-from ray._raylet import StreamingObjectRefGenerator
-
-from ray.data._internal.execution.interfaces.physical_operator import OpTask
 
 
 class MapOperator(OneToOneOperator, ABC):
@@ -68,7 +82,7 @@ class MapOperator(OneToOneOperator, ABC):
         # Output metadata, added to on get_next().
         self._output_metadata: List[BlockMetadata] = []
 
-        self._tasks: Dict[ObjectRef[ObjectRefGenerator], _TaskState] = {}
+        self._tasks: Dict[int, OpTask] = {}
         self._next_task_idx = 0
         super().__init__(name, input_op)
 
@@ -240,56 +254,57 @@ class MapOperator(OneToOneOperator, ABC):
         """
         raise NotImplementedError
 
-    def _handle_task_submitted(self, task: "_TaskState"):
-        """Handle a newly submitted task, notifying the output queue and updating
-        object store metrics.
-
-        This should be called by subclasses right after a task is submitted.
-
-        Args:
-            task: The task state for the newly submitted task.
-        """
-        self._tasks[gen] = task
-        self._next_task_idx += 1
-        # Notify output queue that this task is pending.
-        self._output_queue.notify_pending_task(task)
-
-    @abstractmethod
-    def notify_work_completed(
-        self, ref: Union[ObjectRef[ObjectRefGenerator], ray.ObjectRef]
+    def _submit_data_task(
+        self,
+        gen: StreamingObjectRefGenerator,
+        inputs: RefBundle,
+        task_done_callback: Optional[Callable[[], None]] = None,
     ):
-        """Indicates that a task is done executing OR that a worker is done starting.
+        task_index = self._next_task_idx
+        self._next_task_idx += 1
 
-        This must be implemented by subclasses.
+        def output_ready_callback(output: RefBundle):
+            assert len(output.blocks) == 1
+            # Notify output queue that this task is complete.
+            self._output_queue.notify_task_output_ready(task_index, output)
+            # Update object store metrics.
+            allocated = output.size_bytes()
+            self._metrics.alloc += allocated
+            self._metrics.cur += allocated
+            freed = inputs.size_bytes()
+            self._metrics.freed += freed
+            self._metrics.cur -= freed
+            if self._metrics.cur > self._metrics.peak:
+                self._metrics.peak = self._metrics.cur
 
-        Args:
-            ref: The output ref for the task that's done or the worker that has
-                been started.
-        """
-        raise NotImplementedError
+        def _task_done_callback():
+            self._tasks.pop(task_index)
+            self._output_queue.notify_task_completed(task_index)
+            if task_done_callback:
+                task_done_callback()
 
-    def _handle_task_done(self, task: "_TaskState"):
-        """Handle a newly completed task, notifying the output queue, freeing task
-        inputs, and updating object store metrics.
+        print("submit task")
+        self._tasks[task_index] = DataOpTask(
+            gen,
+            inputs,
+            output_ready_callback,
+            _task_done_callback,
+        )
 
-        This should be called by subclasses right after a task completes.
+    def _submit_metadata_task(
+        self, result_ref: ObjectRef, task_done_callback: Callable[[], None]
+    ):
+        task_index = self._next_task_idx
+        self._next_task_idx += 1
 
-        Args:
-            task: The task state for the newly completed task.
-        """
-        # Notify output queue that this task is complete.
-        self._output_queue.notify_task_completed(task)
-        # task.inputs.destroy_if_owned()
-        # Update object store metrics.
-        allocated = task.output.size_bytes()
-        task.output = None
-        self._metrics.alloc += allocated
-        self._metrics.cur += allocated
-        freed = task.inputs.size_bytes()
-        self._metrics.freed += freed
-        self._metrics.cur -= freed
-        if self._metrics.cur > self._metrics.peak:
-            self._metrics.peak = self._metrics.cur
+        def _task_done_callback():
+            self._tasks.pop(task_index)
+            task_done_callback()
+
+        self._tasks[task_index] = MetadataOpTask(result_ref, _task_done_callback)
+
+    def get_active_tasks(self) -> List[OpTask]:
+        return list(self._tasks.values())
 
     def all_inputs_done(self):
         self._block_ref_bundler.done_adding_bundles()
@@ -312,16 +327,6 @@ class MapOperator(OneToOneOperator, ABC):
         return bundle
 
     @abstractmethod
-    def get_work_refs(
-        self,
-    ) -> List[Union[ObjectRef[ObjectRefGenerator], ray.ObjectRef]]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def num_active_work_refs(self) -> int:
-        raise NotImplementedError
-
-    @abstractmethod
     def progress_str(self) -> str:
         raise NotImplementedError
 
@@ -340,9 +345,7 @@ class MapOperator(OneToOneOperator, ABC):
 
     @abstractmethod
     def shutdown(self):
-        # NOTE: This must be implemented by subclasses, and those overriding methods
-        # must call this method.
-        super().shutdown()
+        pass
 
     @abstractmethod
     def current_resource_usage(self) -> ExecutionResources:
@@ -355,46 +358,6 @@ class MapOperator(OneToOneOperator, ABC):
     @abstractmethod
     def incremental_resource_usage(self) -> ExecutionResources:
         raise NotImplementedError
-
-    @staticmethod
-    def _map_ref_to_ref_bundle(ref: ObjectRef[ObjectRefGenerator]) -> RefBundle:
-        """Utility for converting a generator ref to a RefBundle.
-
-        This function blocks on the completion of the underlying generator task via
-        ray.get().
-        """
-        all_refs = list(ray.get(ref))
-        del ref
-        block_refs = all_refs[:-1]
-        block_metas = ray.get(all_refs[-1])
-        assert len(block_metas) == len(block_refs), (block_refs, block_metas)
-        for ref in block_refs:
-            trace_allocation(ref, "map_operator_work_completed")
-        return RefBundle(list(zip(block_refs, block_metas)), owns_blocks=True)
-
-
-class _TaskState(OpTask):
-    """Tracks the driver-side state for an MapOperator task.
-
-    Attributes:
-        inputs: The input ref bundle.
-        output: The output ref bundle that is set when the task completes.
-    """
-
-    def __init__(self, gen: StreamingObjectRefGenerator, inputs: RefBundle):
-        self.gen = gen
-        self.inputs = inputs
-        self.output = None
-
-    def get_streaming_gen(self):
-        return self._gen
-
-    def on_data_ready(self, refs: RefBundle):
-        pass
-
-    def on_task_done(self):
-        pass
-        self._task_finish_callback()
 
 
 @dataclass
@@ -533,54 +496,54 @@ def _merge_ref_bundles(*bundles: RefBundle) -> RefBundle:
 class _OutputQueue:
     """Interface for swapping between different output order modes."""
 
-    def notify_pending_task(self, task: _TaskState):
-        """Called when a new task becomes pending."""
+    @abstractmethod
+    def notify_task_output_ready(self, task_index: int, output: RefBundle):
+        """Called when a task's output is ready."""
         pass
 
-    def notify_task_completed(self, task: _TaskState):
+    def notify_task_completed(self, task_index: int):
         """Called when a previously pending task completes."""
         pass
 
+    @abstractmethod
     def has_next(self) -> bool:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def get_next(self) -> RefBundle:
-        raise NotImplementedError
+        pass
 
 
 class _OrderedOutputQueue(_OutputQueue):
     """An queue that returns finished tasks in submission order."""
 
     def __init__(self):
-        self._tasks_by_output_order: Dict[int, _TaskState] = {}
-        self._next_task_index: int = 0
-        self._next_output_index: int = 0
+        self._task_outputs: Dict[int, Deque[RefBundle]] = defaultdict(lambda: deque())
+        self._current_output_index: int = 0
+        self._completed_tasks: Set[int] = set()
 
-    def notify_pending_task(self, task: _TaskState):
-        self._tasks_by_output_order[self._next_task_index] = task
-        self._next_task_index += 1
+    def notify_task_output_ready(self, task_index: int, output: RefBundle):
+        self._task_outputs[task_index].append(output)
+
+    def notify_task_completed(self, task_index: int):
+        assert task_index >= self._current_output_index
+        if task_index == self._current_output_index:
+            if len(self._task_outputs[task_index]) == 0:
+                self._current_output_index += 1
+                return
+        self._completed_tasks.add(task_index)
 
     def has_next(self) -> bool:
-        i = self._next_output_index
-        return (
-            i in self._tasks_by_output_order
-            and self._tasks_by_output_order[i].output is not None
-        )
+        return len(self._task_outputs[self._current_output_index]) > 0
 
     def get_next(self) -> RefBundle:
         # Get the output RefBundle for the current task.
-        out_bundle = self._tasks_by_output_order[self._next_output_index].output
-        # Pop out the next single-block bundle.
-        next_bundle = RefBundle(
-            [out_bundle.blocks[0]], owns_blocks=out_bundle.owns_blocks
-        )
-        out_bundle = replace(out_bundle, blocks=out_bundle.blocks[1:])
-        if not out_bundle.blocks:
-            # If this task's RefBundle is exhausted, move to the next one.
-            del self._tasks_by_output_order[self._next_output_index]
-            self._next_output_index += 1
-        else:
-            self._tasks_by_output_order[self._next_output_index].output = out_bundle
+        next_bundle = self._task_outputs[self._current_output_index].popleft()
+        if len(self._task_outputs[self._current_output_index]) == 0:
+            if self._current_output_index in self._completed_tasks:
+                del self._task_outputs[self._current_output_index]
+                self._completed_tasks.remove(self._current_output_index)
+                self._current_output_index += 1
         return next_bundle
 
 
@@ -590,24 +553,14 @@ class _UnorderedOutputQueue(_OutputQueue):
     def __init__(self):
         self._queue: Deque[RefBundle] = deque()
 
-    def notify_task_completed(self, task: _TaskState):
-        self._queue.append(task.output)
+    def notify_task_output_ready(self, task_index: int, output: RefBundle):
+        self._queue.append(output)
 
     def has_next(self) -> bool:
         return len(self._queue) > 0
 
     def get_next(self) -> RefBundle:
-        # Get the output RefBundle for the oldest completed task.
-        out_bundle = self._queue[0]
-        # Pop out the next single-block bundle.
-        next_bundle = RefBundle(
-            [out_bundle.blocks[0]], owns_blocks=out_bundle.owns_blocks
-        )
-        out_bundle = replace(out_bundle, blocks=out_bundle.blocks[1:])
-        if not out_bundle.blocks:
-            # If this task's RefBundle is exhausted, move to the next one.
-            self._queue.popleft()
-        return next_bundle
+        return self._queue.popleft()
 
 
 def _canonicalize_ray_remote_args(ray_remote_args: Dict[str, Any]) -> Dict[str, Any]:

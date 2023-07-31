@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Iterator, List, Optional
 
 import ray
-from ray._raylet import ObjectRefGenerator
+from ray._raylet import ObjectRefGenerator, StreamingObjectRefGenerator
 from ray.data._internal.execution.interfaces import (
     ExecutionResources,
     PhysicalOperator,
@@ -11,12 +11,10 @@ from ray.data._internal.execution.interfaces import (
 from ray.data._internal.execution.operators.map_operator import (
     MapOperator,
     _map_task,
-    _TaskState,
 )
 from ray.data._internal.remote_fn import cached_remote_fn
 from ray.data.block import Block
 from ray.types import ObjectRef
-from ray._raylet import StreamingObjectRefGenerator
 
 
 class TaskPoolMapOperator(MapOperator):
@@ -54,19 +52,16 @@ class TaskPoolMapOperator(MapOperator):
         gen = map_task.options(
             **self._get_runtime_ray_remote_args(input_bundle=bundle), name=self.name
         ).remote(self._transform_fn_ref, ctx, *input_blocks)
-        task = _TaskState(gen, bundle)
-        self._handle_task_submitted(task)
+        self._submit_data_task(gen, bundle)
 
     def shutdown(self):
-        # XXX
-        task_refs = self.get_work_refs()
         # Cancel all active tasks.
-        for task in task_refs:
-            ray.cancel(task)
+        for _, task in self._tasks.items():
+            ray.cancel(task.get_waitable())
         # Wait until all tasks have failed or been cancelled.
-        for task in task_refs:
+        for _, task in self._tasks.items():
             try:
-                ray.get(task)
+                ray.get(task.get_waitable())
             except ray.exceptions.RayError:
                 # Cancellation either succeeded, or the task had already failed with
                 # a different error, or cancellation failed. In all cases, we
@@ -77,10 +72,11 @@ class TaskPoolMapOperator(MapOperator):
     def progress_str(self) -> str:
         return ""
 
-    def base_resource_usage(self) -> ExecutionResources: return ExecutionResources()
+    def base_resource_usage(self) -> ExecutionResources:
+        return ExecutionResources()
 
     def current_resource_usage(self) -> ExecutionResources:
-        num_active_workers = self.num_active_work_refs()
+        num_active_workers = self.num_active_tasks()
         return ExecutionResources(
             cpu=self._ray_remote_args.get("num_cpus", 0) * num_active_workers,
             gpu=self._ray_remote_args.get("num_gpus", 0) * num_active_workers,

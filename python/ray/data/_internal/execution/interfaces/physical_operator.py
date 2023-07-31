@@ -3,13 +3,16 @@ from typing import Callable, Dict, List, Optional, Union
 
 import ray
 from .ref_bundle import RefBundle
+from ray._raylet import StreamingObjectRefGenerator
 from ray.data._internal.execution.interfaces.execution_options import (
     ExecutionOptions,
     ExecutionResources,
 )
 from ray.data._internal.logical.interfaces import Operator
 from ray.data._internal.stats import StatsDict
-from ray._raylet import StreamingObjectRefGenerator
+
+
+Waitable = Union[ray.ObjectRef, StreamingObjectRefGenerator]
 
 
 class OpTask:
@@ -23,23 +26,44 @@ class OpTask:
         pass
 
 
-class ObjectRefBasedOpTask(OpTask):
+class MetadataOpTask(OpTask):
 
-    def __init__(self, object_ref: ray.ObjectRef, on_ready: Callable[[ray.ObjectRef], None]):
+    def __init__(
+        self, object_ref: ray.ObjectRef, task_done_callback: Callable[[], None]
+    ):
         self._object_ref = object_ref
-        self._on_ready = on_ready
+        self._task_done_callback = task_done_callback
 
     def get_waitable(self) -> ray.ObjectRef:
         return self._object_ref
 
     def on_waitable_ready(self):
-        self._on_ready(self._object_ref)
+        self._task_done_callback()
 
 
-class StreamingGenBasedOpTask(OpTask):
+class DataOpTask(OpTask):
 
-    def __init__(self, streaming_gen: StreamingObjectRefGenerator):
+    def __init__(self, streaming_gen: StreamingObjectRefGenerator, inputs: RefBundle, data_ready_callback: Callable[[RefBundle], None], task_done_callback: Callable[[], None]):
         self._streaming_gen = streaming_gen
+        self._inputs = inputs
+        self._data_ready_callback = data_ready_callback
+        self._task_done_callback = task_done_callback
+        self._destroy_called = False
+
+    def get_waitable(self) -> StreamingObjectRefGenerator:
+        return self._streaming_gen
+
+    def on_waitable_ready(self):
+        if not self._destroy_called:
+            self._inputs.destroy_if_owned()
+            self._destroy_called = True
+        try:
+            block_ref = next(self._streaming_gen)
+            meta = ray.get(next(self._streaming_gen))
+            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
+        except StopIteration:
+            self._task_done_callback()
+
 
 class PhysicalOperator(Operator):
     """Abstract class for physical operators.
@@ -94,7 +118,7 @@ class PhysicalOperator(Operator):
         """
         return (
             self._inputs_complete
-            and len(self.get_work_refs()) == 0
+            and self.num_active_tasks() == 0
             and not self.has_next()
         ) or self._dependents_complete
 
@@ -207,13 +231,15 @@ class PhysicalOperator(Operator):
         """
         raise NotImplementedError
 
-    def get_work_refs(self) -> List[ray.ObjectRef]:
-        """Get a list of object references the executor should wait on.
-
-        When a reference becomes ready, the executor must call
-        `notify_work_completed(ref)` to tell this operator of the state change.
-        """
+    def get_active_tasks(self) -> List[OpTask]:
         return []
+
+    def num_active_tasks(self) -> int:
+        """Return the number of active work refs.
+
+        Subclasses can override this as a performance optimization.
+        """
+        return len(self.get_active_tasks())
 
     def throttling_disabled(self) -> bool:
         """Whether to disable resource throttling for this operator.
@@ -223,13 +249,6 @@ class PhysicalOperator(Operator):
         these operators should not be throttled based on resource usage.
         """
         return False
-
-    def num_active_work_refs(self) -> int:
-        """Return the number of active work refs.
-
-        Subclasses can override this as a performance optimization.
-        """
-        return len(self.get_work_refs())
 
     def internal_queue_size(self) -> int:
         """If the operator has an internal input queue, return its size.
@@ -289,6 +308,3 @@ class PhysicalOperator(Operator):
             under_resource_limits: Whether this operator is under resource limits.
         """
         pass
-
-    def get_pending_tasks(self) -> List[OpTask]:
-        return []

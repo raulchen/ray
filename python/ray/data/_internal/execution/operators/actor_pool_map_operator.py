@@ -17,7 +17,6 @@ from ray.data._internal.execution.interfaces import (
 from ray.data._internal.execution.operators.map_operator import (
     MapOperator,
     _map_task,
-    _TaskState,
 )
 from ray.data._internal.execution.util import locality_string
 from ray.data.block import Block, BlockMetadata, _CallableClassProtocol
@@ -137,7 +136,21 @@ class ActorPoolMapOperator(MapOperator):
         assert self._cls is not None
         ctx = DataContext.get_current()
         actor = self._cls.remote(ctx, src_fn_name=self.name, init_fn=self._init_fn)
-        self._actor_pool.add_pending_actor(actor, actor.get_location.remote())
+        res_ref = actor.get_location.remote()
+
+        def task_done_callback():
+            nonlocal res_ref
+            # ref is a future for a now-ready actor; move actor from pending to the
+            # active actor pool.
+            has_actor = self._actor_pool.pending_to_running(res_ref)
+            if not has_actor:
+                # Actor has already been killed.
+                return
+            # For either a completed task or ready worker, we try to dispatch queued tasks.
+            self._dispatch_tasks()
+
+        self._submit_metadata_task(res_ref, task_done_callback)
+        self._actor_pool.add_pending_actor(actor, res_ref)
 
     def _add_bundled_input(self, bundle: RefBundle):
         self._bundle_queue.append(bundle)
@@ -165,12 +178,17 @@ class ActorPoolMapOperator(MapOperator):
             bundle = self._bundle_queue.popleft()
             input_blocks = [block for block, _ in bundle.blocks]
             ctx = TaskContext(task_idx=self._next_task_idx)
-            ref = actor.submit.options(num_returns="dynamic", name=self.name).remote(
+            gen = actor.submit.options(num_returns="streaming", name=self.name).remote(
                 self._transform_fn_ref, ctx, *input_blocks
             )
-            task = _TaskState(bundle)
-            self._tasks[ref] = (task, actor)
-            self._handle_task_submitted(task)
+
+            def task_done_callback():
+                nonlocal actor
+                # Return the actor that was running the task to the pool.
+                self._actor_pool.return_actor(actor)
+                self._dispatch_tasks()
+
+            self._submit_data_task(gen, bundle, task_done_callback)
 
         # Needed in the bulk execution path for triggering autoscaling. This is a
         # no-op in the streaming execution case.
@@ -204,28 +222,6 @@ class ActorPoolMapOperator(MapOperator):
                 # inactive worker exists. If there are no inactive workers to kill, we
                 # break out of the scale-down loop.
                 break
-
-    def notify_work_completed(
-        self, ref: Union[ObjectRef[ObjectRefGenerator], ray.ObjectRef]
-    ):
-        # This actor pool MapOperator implementation has both task output futures AND
-        # worker started futures to handle here.
-        if ref in self._tasks:
-            # Get task state and set output.
-            task, actor = self._tasks.pop(ref)
-            task.output = self._map_ref_to_ref_bundle(ref)
-            self._handle_task_done(task)
-            # Return the actor that was running the task to the pool.
-            self._actor_pool.return_actor(actor)
-        else:
-            # ref is a future for a now-ready actor; move actor from pending to the
-            # active actor pool.
-            has_actor = self._actor_pool.pending_to_running(ref)
-            if not has_actor:
-                # Actor has already been killed.
-                return
-        # For either a completed task or ready worker, we try to dispatch queued tasks.
-        self._dispatch_tasks()
 
     def all_inputs_done(self):
         # Call base implementation to handle any leftover bundles. This may or may not
@@ -277,15 +273,6 @@ class ActorPoolMapOperator(MapOperator):
                 f"{min_workers} distinct blocks. Consider increasing "
                 "the parallelism when creating the Dataset."
             )
-
-    def get_work_refs(self) -> List[ray.ObjectRef]:
-        # Work references that we wish the executor to wait on includes both task
-        # futures AND worker ready futures.
-        return list(self._tasks.keys()) + self._actor_pool.get_pending_actor_refs()
-
-    def num_active_work_refs(self) -> int:
-        # Active work references only includes running tasks, not pending actor starts.
-        return len(self._tasks)
 
     def progress_str(self) -> str:
         base = f"{self._actor_pool.num_running_actors()} actors"
