@@ -31,6 +31,8 @@ from ray.types import ObjectRef
 from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
 from ray._raylet import StreamingObjectRefGenerator
 
+from ray.data._internal.execution.interfaces.physical_operator import OpTask
+
 
 class MapOperator(OneToOneOperator, ABC):
     """A streaming operator that maps input bundles 1:1 to output bundles.
@@ -66,6 +68,8 @@ class MapOperator(OneToOneOperator, ABC):
         # Output metadata, added to on get_next().
         self._output_metadata: List[BlockMetadata] = []
 
+        self._tasks: Dict[ObjectRef[ObjectRefGenerator], _TaskState] = {}
+        self._next_task_idx = 0
         super().__init__(name, input_op)
 
     @classmethod
@@ -245,6 +249,8 @@ class MapOperator(OneToOneOperator, ABC):
         Args:
             task: The task state for the newly submitted task.
         """
+        self._tasks[gen] = task
+        self._next_task_idx += 1
         # Notify output queue that this task is pending.
         self._output_queue.notify_pending_task(task)
 
@@ -367,8 +373,7 @@ class MapOperator(OneToOneOperator, ABC):
         return RefBundle(list(zip(block_refs, block_metas)), owns_blocks=True)
 
 
-@dataclass
-class _TaskState:
+class _TaskState(OpTask):
     """Tracks the driver-side state for an MapOperator task.
 
     Attributes:
@@ -376,8 +381,20 @@ class _TaskState:
         output: The output ref bundle that is set when the task completes.
     """
 
-    inputs: RefBundle
-    output: Optional[RefBundle] = None
+    def __init__(self, gen: StreamingObjectRefGenerator, inputs: RefBundle):
+        self.gen = gen
+        self.inputs = inputs
+        self.output = None
+
+    def get_streaming_gen(self):
+        return self._gen
+
+    def on_data_ready(self, refs: RefBundle):
+        pass
+
+    def on_task_done(self):
+        pass
+        self._task_finish_callback()
 
 
 @dataclass

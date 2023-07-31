@@ -1,4 +1,5 @@
-from typing import Callable, Dict, List, Optional
+from abc import abstractmethod
+from typing import Callable, Dict, List, Optional, Union
 
 import ray
 from .ref_bundle import RefBundle
@@ -10,6 +11,35 @@ from ray.data._internal.logical.interfaces import Operator
 from ray.data._internal.stats import StatsDict
 from ray._raylet import StreamingObjectRefGenerator
 
+
+class OpTask:
+
+    @abstractmethod
+    def get_waitable(self) -> Union[ray.ObjectRef, StreamingObjectRefGenerator]:
+        pass
+
+    @abstractmethod
+    def on_waitable_ready(self):
+        pass
+
+
+class ObjectRefBasedOpTask(OpTask):
+
+    def __init__(self, object_ref: ray.ObjectRef, on_ready: Callable[[ray.ObjectRef], None]):
+        self._object_ref = object_ref
+        self._on_ready = on_ready
+
+    def get_waitable(self) -> ray.ObjectRef:
+        return self._object_ref
+
+    def on_waitable_ready(self):
+        self._on_ready(self._object_ref)
+
+
+class StreamingGenBasedOpTask(OpTask):
+
+    def __init__(self, streaming_gen: StreamingObjectRefGenerator):
+        self._streaming_gen = streaming_gen
 
 class PhysicalOperator(Operator):
     """Abstract class for physical operators.
@@ -260,11 +290,5 @@ class PhysicalOperator(Operator):
         """
         pass
 
-    def get_pending_streaming_gens(self) -> List[StreamingObjectRefGenerator]:
+    def get_pending_tasks(self) -> List[OpTask]:
         return []
-
-    def notify_streaming_gen_data_available(self, gen: StreamingObjectRefGenerator, ref: ray.ObjectRef):
-        pass
-
-    def notify_streaming_gen_done(self, gen: StreamingObjectRefGenerator):
-        pass

@@ -320,8 +320,8 @@ def process_completed_tasks(topology: Topology) -> None:
     for op in topology.keys():
         for ref in op.get_work_refs():
             active_tasks[ref] = op
-        for gen in op.get_pending_streaming_gens():
-            active_streaming_gens[gen] = op
+        for task in op.get_pending_tasks():
+            active_streaming_gens[task.get_streaming_gen()] = task
 
     # Process completed Ray tasks and notify operators.
     if active_tasks:
@@ -342,19 +342,18 @@ def process_completed_tasks(topology: Topology) -> None:
             fetch_local=False,
             timeout=0.1,
         )
-        gens, blocks, metadata = [], [], []
+        gens, block_refs, meta_refs = [], [], []
         for gen in ready:
             try:
-                blocks.append(next(gen))
-                metadata.append(ray.get(next(gen)))
+                block_refs.append(next(gen))
+                meta_refs.append(next(gen))
                 gens.append(gen)
             except StopIteration:
-                op = active_streaming_gens[gen]
-                op.notify_streaming_gen_done(gen)
+                active_streaming_gens[gen].on_task_done()
 
-        for gen, block, meta in zip(gens, blocks, metadata):
-            op = active_streaming_gens[gen]
-            op.notify_streaming_gen_data_available(gen, RefBundle([(block, meta)], owns_blocks=False))
+        metadata = ray.get(meta_refs)
+        for gen, block, meta in zip(gens, block_refs, metadata):
+            active_streaming_gens[gen].on_data_ready(RefBundle([(block, meta)], owns_blocks=False))
 
     # Pull any operator outputs into the streaming op state.
     for op, op_state in topology.items():

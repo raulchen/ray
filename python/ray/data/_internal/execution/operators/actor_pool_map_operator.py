@@ -83,11 +83,6 @@ class ActorPoolMapOperator(MapOperator):
 
         # Create autoscaling policy from compute strategy.
         self._autoscaling_policy = autoscaling_policy
-        # A map from task output futures to task state and the actor on which its
-        # running.
-        self._tasks: Dict[
-            ObjectRef[ObjectRefGenerator], Tuple[_TaskState, ray.actor.ActorHandle]
-        ] = {}
         # A pool of running actors on which we can execute mapper tasks.
         self._actor_pool = _ActorPool(autoscaling_policy._config.max_tasks_in_flight)
         # A queue of bundles awaiting dispatch to actors.
@@ -96,7 +91,6 @@ class ActorPoolMapOperator(MapOperator):
         self._cls = None
         # Whether no more submittable bundles will be added.
         self._inputs_done = False
-        self._next_task_idx = 0
 
     def get_init_fn(self) -> Callable[[], None]:
         return self._init_fn
@@ -174,7 +168,6 @@ class ActorPoolMapOperator(MapOperator):
             ref = actor.submit.options(num_returns="dynamic", name=self.name).remote(
                 self._transform_fn_ref, ctx, *input_blocks
             )
-            self._next_task_idx += 1
             task = _TaskState(bundle)
             self._tasks[ref] = (task, actor)
             self._handle_task_submitted(task)

@@ -45,8 +45,6 @@ class TaskPoolMapOperator(MapOperator):
         super().__init__(
             transform_fn, input_op, name, min_rows_per_bundle, ray_remote_args
         )
-        self._tasks: Dict[ObjectRef[ObjectRefGenerator], _TaskState] = {}
-        self._next_task_idx = 0
 
     def _add_bundled_input(self, bundle: RefBundle):
         # Submit the task as a normal Ray task.
@@ -56,15 +54,11 @@ class TaskPoolMapOperator(MapOperator):
         gen = map_task.options(
             **self._get_runtime_ray_remote_args(input_bundle=bundle), name=self.name
         ).remote(self._transform_fn_ref, ctx, *input_blocks)
-        self._next_task_idx += 1
-        task = _TaskState(bundle)
-        self._tasks[gen] = task
+        task = _TaskState(gen, bundle)
         self._handle_task_submitted(task)
 
-    def notify_work_completed(self, ref: ObjectRef[ObjectRefGenerator]):
-        assert False
-
     def shutdown(self):
+        # XXX
         task_refs = self.get_work_refs()
         # Cancel all active tasks.
         for task in task_refs:
@@ -83,12 +77,6 @@ class TaskPoolMapOperator(MapOperator):
     def progress_str(self) -> str:
         return ""
 
-    def get_work_refs(self) -> List[ray.ObjectRef]:
-        return []
-
-    def num_active_work_refs(self) -> int:
-        return len(self.get_pending_streaming_gens())
-
     def base_resource_usage(self) -> ExecutionResources: return ExecutionResources()
 
     def current_resource_usage(self) -> ExecutionResources:
@@ -104,17 +92,3 @@ class TaskPoolMapOperator(MapOperator):
             cpu=self._ray_remote_args.get("num_cpus", 0),
             gpu=self._ray_remote_args.get("num_gpus", 0),
         )
-
-    def get_pending_streaming_gens(self) -> List[StreamingObjectRefGenerator]:
-        return list(self._tasks.keys())
-
-    def notify_streaming_gen_data_available(self, gen: StreamingObjectRefGenerator, ref_bundle: RefBundle):
-        task: _TaskState = self._tasks[gen]
-        # if gen.is_finished():
-        #     del self._tasks[gen]
-        task.output = ref_bundle
-        self._handle_task_done(task)
-
-    def notify_streaming_gen_done(self, gen: StreamingObjectRefGenerator):
-        self._tasks[gen].inputs.destroy_if_owned()
-        del self._tasks[gen]
