@@ -35,6 +35,7 @@ from ray.data._internal.execution.operators.task_pool_map_operator import (
 from ray.data._internal.execution.operators.union_operator import UnionOperator
 from ray.data._internal.execution.util import make_ref_bundles
 from ray.data.block import Block
+from ray.data.tests.util import run_one_op_task, run_op_tasks_sync
 from ray.tests.conftest import *  # noqa
 
 
@@ -147,16 +148,14 @@ def test_map_operator_bulk(ray_start_regular_shared, use_actors):
         else:
             assert op.internal_queue_size() == 0
     op.all_inputs_done()
-    work_refs = op.get_work_refs()
-    while work_refs:
-        for work_ref in work_refs:
-            ray.get(work_ref)
-            op.notify_work_completed(work_ref)
-        work_refs = op.get_work_refs()
-        if use_actors and work_refs:
+
+    def predict(tasks):
+        if use_actors and tasks:
             # After actor is ready (first work ref resolved), actor will remain ready
             # while there is work to do.
             assert op.progress_str() == "1 actors [locality off]"
+
+    run_op_tasks_sync(op, predict)
     assert op.internal_queue_size() == 0
     if use_actors:
         # After all work is done, actor will have been killed to free up resources..
@@ -203,9 +202,7 @@ def test_map_operator_streamed(ray_start_regular_shared, use_actors):
     while input_op.has_next():
         op.add_input(input_op.get_next(), 0)
         while not op.has_next():
-            work_refs = op.get_work_refs()
-            ready, _ = ray.wait(work_refs, num_returns=1, fetch_local=False)
-            op.notify_work_completed(ready[0])
+            run_one_op_task(op)
         while op.has_next():
             ref = op.get_next()
             assert ref.owns_blocks, ref
@@ -366,9 +363,7 @@ def test_map_operator_actor_locality_stats(ray_start_regular_shared):
     while input_op.has_next():
         op.add_input(input_op.get_next(), 0)
         while not op.has_next():
-            work_refs = op.get_work_refs()
-            ready, _ = ray.wait(work_refs, num_returns=1, fetch_local=False)
-            op.notify_work_completed(ready[0])
+            run_one_op_task(op)
         while op.has_next():
             ref = op.get_next()
             assert ref.owns_blocks, ref
@@ -411,12 +406,7 @@ def test_map_operator_min_rows_per_bundle(ray_start_regular_shared, use_actors):
     while input_op.has_next():
         op.add_input(input_op.get_next(), 0)
     op.all_inputs_done()
-    work_refs = op.get_work_refs()
-    while work_refs:
-        for work_ref in work_refs:
-            ray.get(work_ref)
-            op.notify_work_completed(work_ref)
-        work_refs = op.get_work_refs()
+    run_op_tasks_sync(op)
 
     # Check we return transformed bundles in order.
     assert _take_outputs(op) == [[i] for i in range(10)]
@@ -456,12 +446,7 @@ def test_map_operator_output_unbundling(
     for input_ in inputs:
         op.add_input(input_, 0)
     op.all_inputs_done()
-    work_refs = op.get_work_refs()
-    while work_refs:
-        for work_ref in work_refs:
-            ray.get(work_ref)
-            op.notify_work_completed(work_ref)
-        work_refs = op.get_work_refs()
+    run_op_tasks_sync(op)
 
     # Check that bundles are unbundled in the output queue.
     outputs = []
@@ -491,12 +476,7 @@ def test_map_operator_ray_args(shutdown_only, use_actors):
     while input_op.has_next():
         op.add_input(input_op.get_next(), 0)
     op.all_inputs_done()
-    work_refs = op.get_work_refs()
-    while work_refs:
-        for work_ref in work_refs:
-            ray.get(work_ref)
-            op.notify_work_completed(work_ref)
-        work_refs = op.get_work_refs()
+    run_op_tasks_sync(op)
 
     # Check we don't hang and complete with num_gpus=1.
     assert _take_outputs(op) == [[i * 2] for i in range(10)]
@@ -525,7 +505,7 @@ def test_map_operator_shutdown(shutdown_only, use_actors):
     # Start one task and then cancel.
     op.start(ExecutionOptions())
     op.add_input(input_op.get_next(), 0)
-    assert len(op.get_work_refs()) == 1
+    assert op.num_active_tasks() == 1
     op.shutdown()
 
     # Tasks/actors should be cancelled/killed.
@@ -579,8 +559,7 @@ def test_actor_pool_map_operator_should_add_input(ray_start_regular_shared):
 
     # Cannot add input until actor has started.
     assert not op.should_add_input()
-    for ref in op.get_work_refs():
-        op.notify_work_completed(ref)
+    run_op_tasks_sync(op)
     assert op.should_add_input()
 
     # Can accept up to four inputs per actor by default.

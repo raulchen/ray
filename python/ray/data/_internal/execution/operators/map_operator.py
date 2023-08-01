@@ -283,7 +283,6 @@ class MapOperator(OneToOneOperator, ABC):
             if task_done_callback:
                 task_done_callback()
 
-        print("submit task")
         self._tasks[task_index] = DataOpTask(
             gen,
             inputs,

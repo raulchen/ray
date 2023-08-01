@@ -257,14 +257,6 @@ class PhysicalOperator(Operator):
         """
         return 0
 
-    def notify_work_completed(self, work_ref: ray.ObjectRef) -> None:
-        """Executor calls this when the given work is completed and local.
-
-        This must be called as soon as the operator is aware that `work_ref` is
-        ready.
-        """
-        raise NotImplementedError
-
     def shutdown(self) -> None:
         """Abort execution and release all resources used by this operator.
 
