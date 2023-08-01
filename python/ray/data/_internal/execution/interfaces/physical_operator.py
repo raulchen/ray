@@ -59,7 +59,6 @@ class DataOpTask(OpTask):
         if not self._destroy_called:
             self._inputs.destroy_if_owned()
             self._destroy_called = True
-        block_ref = None
         try:
             block_ref = next(self._streaming_gen)
         except StopIteration:
@@ -69,11 +68,10 @@ class DataOpTask(OpTask):
         try:
             meta = ray.get(next(self._streaming_gen))
         except StopIteration:
-            meta = BlockMetadata.empty()
-            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
+            ex = ray.get(block_ref)
             self._task_done_callback()
-        else:
-            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
+            raise ex
+        self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
 
 
 class PhysicalOperator(Operator):
