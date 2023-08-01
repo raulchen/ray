@@ -2,6 +2,8 @@ from abc import abstractmethod
 from typing import Callable, Dict, List, Optional, Union
 
 import ray
+
+from ray.data.block import BlockMetadata
 from .ref_bundle import RefBundle
 from ray._raylet import StreamingObjectRefGenerator
 from ray.data._internal.execution.interfaces.execution_options import (
@@ -57,12 +59,21 @@ class DataOpTask(OpTask):
         if not self._destroy_called:
             self._inputs.destroy_if_owned()
             self._destroy_called = True
+        block_ref = None
         try:
             block_ref = next(self._streaming_gen)
-            meta = ray.get(next(self._streaming_gen))
-            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
         except StopIteration:
             self._task_done_callback()
+            return
+
+        try:
+            meta = ray.get(next(self._streaming_gen))
+        except StopIteration:
+            meta = BlockMetadata.empty()
+            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
+            self._task_done_callback()
+        else:
+            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
 
 
 class PhysicalOperator(Operator):

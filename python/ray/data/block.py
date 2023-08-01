@@ -211,6 +211,10 @@ class BlockMetadata:
         if self.input_files is None:
             self.input_files = []
 
+    @classmethod
+    def empty(cls):
+        return cls(0, 0, None, None, None)
+
 
 @DeveloperAPI
 class BlockAccessor:
