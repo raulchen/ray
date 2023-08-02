@@ -50,15 +50,11 @@ class DataOpTask(OpTask):
         self._inputs = inputs
         self._data_ready_callback = data_ready_callback
         self._task_done_callback = task_done_callback
-        self._destroy_called = False
 
     def get_waitable(self) -> StreamingObjectRefGenerator:
         return self._streaming_gen
 
     def on_waitable_ready(self):
-        if not self._destroy_called:
-            self._inputs.destroy_if_owned()
-            self._destroy_called = True
         try:
             block_ref = next(self._streaming_gen)
         except StopIteration:
