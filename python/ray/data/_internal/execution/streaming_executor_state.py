@@ -334,7 +334,7 @@ def process_completed_tasks(topology: Topology) -> None:
             list(active_tasks.keys()),
             num_returns=len(active_tasks),
             fetch_local=False,
-            timeout=0.1,
+            timeout=0.01,
         )
         for ref in ready:
             active_tasks[ref].on_waitable_ready()
