@@ -120,6 +120,7 @@ class OpState:
         # (in addition to the streaming executor thread). Hence, it must be a
         # thread-safe type such as `deque`.
         self.outqueue: Deque[MaybeRefBundle] = deque()
+        self._outqueue_memory_usage: int = 0
         self.op = op
         self.progress_bar = None
         self.num_completed_tasks = 0
@@ -169,6 +170,7 @@ class OpState:
     def add_output(self, ref: RefBundle) -> None:
         """Move a bundle produced by the operator to its outqueue."""
         self.outqueue.append(ref)
+        self._outqueue_memory_usage += ref.size_bytes()
         self.num_completed_tasks += 1
         if self.progress_bar:
             self.progress_bar.update(1)
@@ -210,7 +212,10 @@ class OpState:
             try:
                 # Non-split output case.
                 if output_split_idx is None:
-                    return self.outqueue.popleft()
+                    bundle = self.outqueue.popleft()
+                    if isinstance(bundle, RefBundle):
+                        self._outqueue_memory_usage -= bundle.size_bytes()
+                    return bundle
 
                 # Scan the queue and look for outputs tagged for the given index.
                 for i in range(len(self.outqueue)):
@@ -222,6 +227,7 @@ class OpState:
                         return bundle
                     elif bundle.output_split_idx == output_split_idx:
                         self.outqueue.remove(bundle)
+                        self._outqueue_memory_usage -= bundle.size_bytes()
                         return bundle
 
                 # Didn't find any outputs matching this index, repeat the loop until
@@ -241,7 +247,7 @@ class OpState:
 
     def outqueue_memory_usage(self) -> int:
         """Return the object store memory of this operator's outqueue."""
-        return self._queue_memory_usage(self.outqueue)
+        return self._outqueue_memory_usage
 
     def _queue_memory_usage(self, queue: Deque[RefBundle]) -> int:
         """Sum the object store memory usage in this queue.
