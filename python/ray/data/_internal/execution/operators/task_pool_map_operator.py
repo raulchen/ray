@@ -56,10 +56,10 @@ class TaskPoolMapOperator(MapOperator):
 
     def shutdown(self):
         # Cancel all active tasks.
-        for _, task in self._tasks.items():
+        for _, task in self._data_tasks.items():
             ray.cancel(task.get_waitable())
         # Wait until all tasks have failed or been cancelled.
-        for _, task in self._tasks.items():
+        for _, task in self._data_tasks.items():
             try:
                 ray.get(task.get_waitable())
             except ray.exceptions.RayError:
