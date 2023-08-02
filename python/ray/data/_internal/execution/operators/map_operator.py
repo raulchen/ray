@@ -82,8 +82,10 @@ class MapOperator(OneToOneOperator, ABC):
         # Output metadata, added to on get_next().
         self._output_metadata: List[BlockMetadata] = []
 
-        self._tasks: Dict[int, OpTask] = {}
-        self._next_task_idx = 0
+        self._data_tasks: Dict[int, OpTask] = {}
+        self._next_data_task_idx = 0
+        self._metadata_tasks: Dict[int, OpTask] = {}
+        self._next_metadata_task_idx = 0
         super().__init__(name, input_op)
 
     @classmethod
@@ -260,8 +262,8 @@ class MapOperator(OneToOneOperator, ABC):
         inputs: RefBundle,
         task_done_callback: Optional[Callable[[], None]] = None,
     ):
-        task_index = self._next_task_idx
-        self._next_task_idx += 1
+        task_index = self._next_data_task_idx
+        self._next_data_task_idx += 1
 
         def output_ready_callback(output: RefBundle):
             assert len(output.blocks) == 1
@@ -278,12 +280,12 @@ class MapOperator(OneToOneOperator, ABC):
                 self._metrics.peak = self._metrics.cur
 
         def _task_done_callback():
-            self._tasks.pop(task_index)
+            self._data_tasks.pop(task_index)
             self._output_queue.notify_task_completed(task_index)
             if task_done_callback:
                 task_done_callback()
 
-        self._tasks[task_index] = DataOpTask(
+        self._data_tasks[task_index] = DataOpTask(
             gen,
             inputs,
             output_ready_callback,
@@ -293,17 +295,17 @@ class MapOperator(OneToOneOperator, ABC):
     def _submit_metadata_task(
         self, result_ref: ObjectRef, task_done_callback: Callable[[], None]
     ):
-        task_index = self._next_task_idx
-        self._next_task_idx += 1
+        task_index = self._next_metadata_task_idx
+        self._next_metadata_task_idx += 1
 
         def _task_done_callback():
-            self._tasks.pop(task_index)
+            self._metadata_tasks.pop(task_index)
             task_done_callback()
 
-        self._tasks[task_index] = MetadataOpTask(result_ref, _task_done_callback)
+        self._metadata_tasks[task_index] = MetadataOpTask(result_ref, _task_done_callback)
 
     def get_active_tasks(self) -> List[OpTask]:
-        return list(self._tasks.values())
+        return list(self._metadata_tasks.values()) + list(self._data_tasks.values())
 
     def all_inputs_done(self):
         self._block_ref_bundler.done_adding_bundles()

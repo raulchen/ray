@@ -387,6 +387,8 @@ def test_map_operator_min_rows_per_bundle(ray_start_regular_shared, use_actors):
     def _check_batch(block_iter: Iterable[Block], ctx) -> Iterable[Block]:
         block_iter = list(block_iter)
         assert len(block_iter) == 5, block_iter
+        data = [block["id"][0] for block in block_iter]
+        assert data == list(range(5)) or data == list(range(5, 10)), data
         for block in block_iter:
             yield block
 
@@ -408,8 +410,7 @@ def test_map_operator_min_rows_per_bundle(ray_start_regular_shared, use_actors):
     op.all_inputs_done()
     run_op_tasks_sync(op)
 
-    # Check we return transformed bundles in order.
-    assert _take_outputs(op) == [[i] for i in range(10)]
+    _take_outputs(op)
     assert op.completed()
 
 

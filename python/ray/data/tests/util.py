@@ -68,7 +68,7 @@ def run_op_tasks_sync(op, predicate = None):
             task.on_waitable_ready()
         tasks = op.get_active_tasks()
         if predicate:
-            predicate()
+            predicate(tasks)
 
 
 def run_one_op_task(op):

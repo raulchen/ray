@@ -177,15 +177,15 @@ class ActorPoolMapOperator(MapOperator):
             # Submit the map task.
             bundle = self._bundle_queue.popleft()
             input_blocks = [block for block, _ in bundle.blocks]
-            ctx = TaskContext(task_idx=self._next_task_idx)
+            ctx = TaskContext(task_idx=self._next_data_task_idx)
             gen = actor.submit.options(num_returns="streaming", name=self.name).remote(
                 self._transform_fn_ref, ctx, *input_blocks
             )
 
+            actor_to_return = actor
             def task_done_callback():
-                nonlocal actor
                 # Return the actor that was running the task to the pool.
-                self._actor_pool.return_actor(actor)
+                self._actor_pool.return_actor(actor_to_return)
                 self._dispatch_tasks()
 
             self._submit_data_task(gen, bundle, task_done_callback)
