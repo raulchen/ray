@@ -57,17 +57,13 @@ class DataOpTask(OpTask):
     def on_waitable_ready(self):
         try:
             block_ref = next(self._streaming_gen)
-        except StopIteration:
-            self._task_done_callback()
-            return
-
-        try:
+            if self._streaming_gen._generator_task_exception is not None:
+                raise self._streaming_gen._generator_task_exception
             meta = ray.get(next(self._streaming_gen))
         except StopIteration:
-            ex = ray.get(block_ref)
             self._task_done_callback()
-            raise ex
-        self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
+        else:
+            self._data_ready_callback(RefBundle([(block_ref, meta)], owns_blocks=True))
 
 
 class PhysicalOperator(Operator):
