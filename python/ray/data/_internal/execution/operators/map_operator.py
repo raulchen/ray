@@ -264,11 +264,9 @@ class MapOperator(OneToOneOperator, ABC):
     ):
         task_index = self._next_data_task_idx
         self._next_data_task_idx += 1
-        input_destroyed = False
 
         def output_ready_callback(output: RefBundle):
-            nonlocal input_destroyed
-
+            nonlocal inputs
             assert len(output.blocks) == 1
             # Notify output queue that this task is complete.
             self._output_queue.notify_task_output_ready(task_index, output)
@@ -277,17 +275,15 @@ class MapOperator(OneToOneOperator, ABC):
             self._metrics.alloc += allocated
             self._metrics.cur += allocated
 
-            if not input_destroyed:
-                inputs.destroy_if_owned()
-                freed = inputs.size_bytes()
-                self._metrics.freed += freed
-                self._metrics.cur -= freed
-                input_destroyed = True
-
             if self._metrics.cur > self._metrics.peak:
                 self._metrics.peak = self._metrics.cur
 
         def _task_done_callback():
+            nonlocal inputs
+            inputs.destroy_if_owned()
+            freed = inputs.size_bytes()
+            self._metrics.freed += freed
+            self._metrics.cur -= freed
             self._data_tasks.pop(task_index)
             self._output_queue.notify_task_completed(task_index)
             if task_done_callback:
