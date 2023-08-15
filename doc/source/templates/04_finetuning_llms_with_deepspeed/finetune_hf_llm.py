@@ -78,16 +78,7 @@ def get_tokenizer(model_name, special_tokens):
 
 def create_ray_dataset(path):
     # jsonl file
-    with open(path, "r") as json_file:
-        items = [json.loads(x) for x in json_file]
-
-    dataset = {"input": []}
-    for item in items:
-        assert set(item.keys()) == {"input"}
-        dataset["input"].append(item["input"])
-
-    df = pd.DataFrame.from_dict(dataset)
-    return ray.data.from_pandas(df)
+    return ray.data.read_json(path)
 
 
 def evaluate(
