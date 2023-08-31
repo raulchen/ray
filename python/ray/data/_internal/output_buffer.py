@@ -62,7 +62,7 @@ class BlockOutputBuffer:
             return not self._returned_at_least_one_block or self._buffer.num_rows() > 0
         else:
             return (
-                self._buffer.get_estimated_memory_usage() > self._target_max_block_size
+                self._buffer.num_rows() >= 32
             )
 
     def next(self) -> Block:

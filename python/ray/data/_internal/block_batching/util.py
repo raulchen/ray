@@ -155,12 +155,15 @@ def format_batches(
     Returns:
         An iterator over batch index and the formatted batch.
     """
+    # import cProfile
+    # with cProfile.Profile() as p:
     for batch in block_iter:
         with stats.iter_format_batch_s.timer() if stats else nullcontext():
             formatted_batch = BlockAccessor.for_block(batch.data).to_batch_format(
                 batch_format
             )
         yield Batch(batch.batch_idx, formatted_batch)
+        # p.dump_stats("/tmp/perf.prof")
 
 
 def collate(

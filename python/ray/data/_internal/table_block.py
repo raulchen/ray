@@ -18,7 +18,7 @@ T = TypeVar("T")
 
 # The max size of Python tuples to buffer before compacting them into a
 # table in the BlockBuilder.
-MAX_UNCOMPACTED_SIZE_BYTES = 50 * 1024 * 1024
+MAX_UNCOMPACTED_SIZE_BYTES = 500 * 1024 * 1024
 
 
 class TableBlockBuilder(BlockBuilder):
@@ -73,8 +73,8 @@ class TableBlockBuilder(BlockBuilder):
                 value = np.array(value)
             self._columns[key].append(value)
         self._num_rows += 1
-        self._compact_if_needed()
-        self._uncompacted_size.add(item)
+        # self._compact_if_needed()
+        # self._uncompacted_size.add(item)
 
     def add_block(self, block: Any) -> None:
         if not isinstance(block, self._block_type):
@@ -139,6 +139,7 @@ class TableBlockBuilder(BlockBuilder):
         assert self._columns
         if self._uncompacted_size.size_bytes() < MAX_UNCOMPACTED_SIZE_BYTES:
             return
+        print("_compact_if_needed", [(k, len(v)) for k, v in self._columns.items()])
         columns = {
             key: convert_udf_returns_to_numpy(col) for key, col in self._columns.items()
         }

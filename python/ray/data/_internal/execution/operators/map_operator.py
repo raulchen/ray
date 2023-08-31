@@ -270,6 +270,8 @@ class MapOperator(OneToOneOperator, ABC):
         def _task_done_callback(task_index, inputs):
             # We should only destroy the input bundle when the whole task is done.
             # Otherwise, if the task crashes in the middle, we can't rerun it.
+            # import time
+            # print(f"task done {task_index}, {time.time()}")
             inputs.destroy_if_owned()
             freed = inputs.size_bytes()
             self._metrics.freed += freed
@@ -279,6 +281,9 @@ class MapOperator(OneToOneOperator, ABC):
             self._output_queue.notify_task_completed(task_index)
             if task_done_callback:
                 task_done_callback()
+
+        # import time
+        # print(f"task submitted {task_index}, {time.time()}")
 
         self._data_tasks[task_index] = DataOpTask(
             gen,
@@ -393,6 +398,8 @@ def _map_task(
         A generator of blocks, followed by the list of BlockMetadata for the blocks
         as the last generator return.
     """
+    # import cProfile
+    # with cProfile.Profile() as p:
     DataContext._set_current(data_context)
     stats = BlockExecStats.builder()
     for b_out in map_transformer.apply_transform(iter(blocks), ctx):
@@ -402,6 +409,10 @@ def _map_task(
         yield b_out
         yield m_out
         stats = BlockExecStats.builder()
+        # import random
+        # filename = "/tmp/perf/" + str(random.randint(0, 100)) + ".prof"
+        # p.dump_stats(filename)
+        # print("dumpped", filename)
 
 
 class _BlockRefBundler:

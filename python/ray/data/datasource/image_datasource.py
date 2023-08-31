@@ -91,11 +91,8 @@ class ImageDatasource(FileBasedDatasource):
         if mode is not None:
             image = image.convert(mode)
 
-        array = np.array(image)
-        if include_paths:
-            item = {"image": array, "path": path}
-        else:
-            item = {"image": array}
+        # array = np.array(image)
+        item = {"image": image}
         return item
 
     def _rows_per_file(self):

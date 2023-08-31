@@ -18,13 +18,16 @@ FULL_IMAGE_SIZE = (1213, 1546)
 
 def iterate(dataset, label, batch_size, metrics):
     start = time.time()
+    print("start iter", time.time())
     it = iter(dataset)
     num_rows = 0
     for batch in it:
-        # NOTE(swang): This will be slightly off if batch_size does not divide
-        # evenly into number of images but should be okay for large enough
-        # datasets.
         num_rows += batch_size
+    # import cProfile
+    # with cProfile.Profile() as p:
+    #     for batch in it:
+    #         num_rows += batch_size
+    #     p.dump_stats("/tmp/perf.prof")
     end = time.time()
     print(label, end - start, "epoch", i)
 
@@ -44,7 +47,7 @@ def build_torch_dataset(
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        persistent_workers=True,
+        persistent_workers=False,
     )
     return data_loader
 
@@ -134,15 +137,15 @@ def crop_and_flip_image_batch(image_batch):
     image_batch["image"] = transform(
         # Make sure to use torch.tensor here to avoid a copy from numpy.
         # Original dims are (batch_size, channels, height, width).
-        torch.tensor(np.transpose(image_batch["image"], axes=(0, 3, 1, 2)))
+        torch.from_numpy(np.transpose(image_batch["image"], axes=(0, 3, 1, 2)))
     )
     return image_batch
 
 
 def crop_and_flip_image(row):
-    transform = get_transform(False)
+    transform = get_transform(True)
     # Make sure to use torch.tensor here to avoid a copy from numpy.
-    row["image"] = transform(torch.tensor(np.transpose(row["image"], axes=(2, 0, 1))))
+    row["image"] = transform(row["image"])
     return row
 
 
@@ -173,87 +176,89 @@ if __name__ == "__main__":
 
     metrics = {}
 
-    tf_dataset = tf.keras.preprocessing.image_dataset_from_directory(
-        args.data_root, batch_size=args.batch_size, image_size=FULL_IMAGE_SIZE
-    )
-    for i in range(args.num_epochs):
-        iterate(tf_dataset, "tf_data", args.batch_size, metrics)
-    tf_dataset = tf_dataset.map(lambda img, label: (tf_crop_and_flip(img), label))
-    for i in range(args.num_epochs):
-        iterate(tf_dataset, "tf_data+transform", args.batch_size, metrics)
+    # tf_dataset = tf.keras.preprocessing.image_dataset_from_directory(
+    #     args.data_root, batch_size=args.batch_size, image_size=FULL_IMAGE_SIZE
+    # )
+    # for i in range(args.num_epochs):
+    #     iterate(tf_dataset, "tf_data", args.batch_size, metrics)
+    # tf_dataset = tf_dataset.map(lambda img, label: (tf_crop_and_flip(img), label))
+    # for i in range(args.num_epochs):
+    #     iterate(tf_dataset, "tf_data+transform", args.batch_size, metrics)
 
-    torch_dataset = build_torch_dataset(
-        args.data_root, args.batch_size, transform=torchvision.transforms.ToTensor()
-    )
-    for i in range(args.num_epochs):
-        iterate(torch_dataset, "torch", args.batch_size, metrics)
+    # torch_dataset = build_torch_dataset(
+    #     args.data_root, args.batch_size, transform=torchvision.transforms.ToTensor()
+    # )
+    # for i in range(args.num_epochs):
+    #     iterate(torch_dataset, "torch", args.batch_size, metrics)
     torch_dataset = build_torch_dataset(
         args.data_root, args.batch_size, transform=get_transform(True)
     )
     for i in range(args.num_epochs):
         iterate(torch_dataset, "torch+transform", args.batch_size, metrics)
 
-    ray_dataset = ray.data.read_images(args.data_root).map(crop_and_flip_image)
+    # ray.data.DataContext.target_max_block_size = 16.5 * 1024 * 1024
+    ray_dataset = ray.data.read_images(args.data_root, mode="RGB").map(crop_and_flip_image)
     for i in range(args.num_epochs):
         iterate(
-            ray_dataset.iter_torch_batches(batch_size=args.batch_size),
+            ray_dataset.iter_torch_batches(batch_size=args.batch_size, prefetch_batches=4),
             "ray_data+map_transform",
             args.batch_size,
             metrics,
         )
+       # print(ray_dataset.stats())
 
-    ray_dataset = ray.data.read_images(args.data_root).map_batches(
-        crop_and_flip_image_batch
-    )
-    for i in range(args.num_epochs):
-        iterate(
-            ray_dataset.iter_torch_batches(batch_size=args.batch_size),
-            "ray_data+transform",
-            args.batch_size,
-            metrics,
-        )
+    # ray_dataset = ray.data.read_images(args.data_root).map_batches(
+    #     crop_and_flip_image_batch
+    # )
+    # for i in range(args.num_epochs):
+    #     iterate(
+    #         ray_dataset.iter_torch_batches(batch_size=args.batch_size),
+    #         "ray_data+transform",
+    #         args.batch_size,
+    #         metrics,
+    #     )
 
-    ray_dataset = ray.data.read_images(args.data_root).map_batches(
-        crop_and_flip_image_batch, zero_copy_batch=True
-    )
-    for i in range(args.num_epochs):
-        iterate(
-            ray_dataset.iter_torch_batches(batch_size=args.batch_size),
-            "ray_data+transform+zerocopy",
-            args.batch_size,
-            metrics,
-        )
+    # ray_dataset = ray.data.read_images(args.data_root).map_batches(
+    #     crop_and_flip_image_batch, zero_copy_batch=True
+    # )
+    # for i in range(args.num_epochs):
+    #     iterate(
+    #         ray_dataset.iter_torch_batches(batch_size=args.batch_size),
+    #         "ray_data+transform+zerocopy",
+    #         args.batch_size,
+    #         metrics,
+    #     )
 
-    ray_dataset = ray.data.read_images(args.data_root)
-    for i in range(args.num_epochs):
-        iterate(
-            ray_dataset.iter_torch_batches(batch_size=args.batch_size),
-            "ray_data",
-            args.batch_size,
-            metrics,
-        )
+    # ray_dataset = ray.data.read_images(args.data_root)
+    # for i in range(args.num_epochs):
+    #     iterate(
+    #         ray_dataset.iter_torch_batches(batch_size=args.batch_size),
+    #         "ray_data",
+    #         args.batch_size,
+    #         metrics,
+    #     )
 
-    # Test manual loading using map_batches on the pathnames.
-    def load(batch):
-        batch["image"] = [torchvision.io.read_image(path) for path in batch["image"]]
-        return batch
+    # # Test manual loading using map_batches on the pathnames.
+    # def load(batch):
+    #     batch["image"] = [torchvision.io.read_image(path) for path in batch["image"]]
+    #     return batch
 
-    paths = []
-    for subdir in os.listdir(args.data_root):
-        paths += [
-            os.path.join(args.data_root, subdir, basename)
-            for basename in os.listdir(os.path.join(args.data_root, subdir))
-        ]
-    ray_dataset = ray.data.from_items([{"image": path} for path in paths]).map_batches(
-        load
-    )
-    for i in range(args.num_epochs):
-        iterate(
-            ray_dataset.iter_torch_batches(batch_size=args.batch_size),
-            "ray_data_manual_load",
-            args.batch_size,
-            metrics,
-        )
+    # paths = []
+    # for subdir in os.listdir(args.data_root):
+    #     paths += [
+    #         os.path.join(args.data_root, subdir, basename)
+    #         for basename in os.listdir(os.path.join(args.data_root, subdir))
+    #     ]
+    # ray_dataset = ray.data.from_items([{"image": path} for path in paths]).map_batches(
+    #     load
+    # )
+    # for i in range(args.num_epochs):
+    #     iterate(
+    #         ray_dataset.iter_torch_batches(batch_size=args.batch_size),
+    #         "ray_data_manual_load",
+    #         args.batch_size,
+    #         metrics,
+    #     )
 
     metrics_dict = defaultdict(dict)
     for label, tput in metrics.items():
@@ -264,11 +269,13 @@ if __name__ == "__main__":
         "success": 1,
     }
 
-    test_output_json = os.environ.get(
-        "TEST_OUTPUT_JSON", "/tmp/image_loader_microbenchmark.json"
-    )
+    print(metrics_dict)
 
-    with open(test_output_json, "wt") as f:
-        json.dump(result_dict, f)
+    # test_output_json = os.environ.get(
+    #     "TEST_OUTPUT_JSON", "/tmp/image_loader_microbenchmark.json"
+    # )
 
-    print(f"Finished benchmark, metrics exported to {test_output_json}.")
+    # with open(test_output_json, "wt") as f:
+    #     json.dump(result_dict, f)
+
+    # print(f"Finished benchmark, metrics exported to {test_output_json}.")

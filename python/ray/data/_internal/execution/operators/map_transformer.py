@@ -116,11 +116,18 @@ class MapTransformer:
         self, input_blocks: Iterable[Block], ctx: TaskContext
     ) -> Iterable[Block]:
         """Apply the transform functions to the input blocks."""
-        iter = input_blocks
-        # Apply the transform functions sequentially to the input iterable.
-        for transform_fn in self._transform_fns:
-            iter = transform_fn(iter, ctx)
-        return iter
+        def wrapper():
+            iter = input_blocks # Apply the transform functions sequentially to the input iterable.
+            for transform_fn in self._transform_fns:
+                iter = transform_fn(iter, ctx)
+            return iter
+
+        yield from wrapper()
+        # import cProfile
+        # with cProfile.Profile() as p:
+        #     yield from wrapper()
+        #     p.dump_stats("/tmp/perf.prof")
+        #     print("perf dumpped")
 
     def fuse(self, other: "MapTransformer") -> "MapTransformer":
         """Fuse two `MapTransformer`s together."""
