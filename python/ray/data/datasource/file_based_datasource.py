@@ -19,6 +19,7 @@ from typing import (
 )
 
 import numpy as np
+from pyarrow.util import functools
 
 from ray._private.utils import _add_creatable_buckets_param_if_s3_uri
 from ray.air._internal.remote_storage import _is_local_windows_path
@@ -44,6 +45,8 @@ from ray.data.datasource.partitioning import (
     PathPartitionParser,
 )
 from ray.util.annotations import DeveloperAPI, PublicAPI
+
+from ray.data._internal.block_batching.util import make_async_gen
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -607,8 +610,10 @@ class _FileBasedDatasourceReader(Reader):
                 rows_per_file=self._delegate._rows_per_file(),
                 file_sizes=file_sizes,
             )
+
+
             read_task = ReadTask(
-                lambda read_paths=read_paths: read_files(read_paths, filesystem), meta
+                lambda read_paths=read_paths: make_async_gen(read_paths, functools.partial(read_paths, fs=filesystem)), meta
             )
             read_tasks.append(read_task)
 
