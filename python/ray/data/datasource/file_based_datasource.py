@@ -23,6 +23,7 @@ from pyarrow.util import functools
 
 from ray._private.utils import _add_creatable_buckets_param_if_s3_uri
 from ray.air._internal.remote_storage import _is_local_windows_path
+from ray.data._internal.block_batching.util import make_async_gen
 from ray.data._internal.dataset_logger import DatasetLogger
 from ray.data._internal.execution.interfaces import TaskContext
 from ray.data._internal.progress_bar import ProgressBar
@@ -45,8 +46,6 @@ from ray.data.datasource.partitioning import (
     PathPartitionParser,
 )
 from ray.util.annotations import DeveloperAPI, PublicAPI
-
-from ray.data._internal.block_batching.util import make_async_gen
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -544,11 +543,10 @@ class _FileBasedDatasourceReader(Reader):
         open_input_source = self._delegate._open_input_source
 
         def read_files(
-            read_paths: List[str],
+            read_paths: Iterable[str],
             fs: Union["pyarrow.fs.FileSystem", _S3FileSystemWrapper],
         ) -> Iterable[Block]:
             DataContext._set_current(ctx)
-            logger.get_logger().debug(f"Reading {len(read_paths)} files.")
             fs = _unwrap_s3_serialization_workaround(filesystem)
             for read_path in read_paths:
                 compression = open_stream_args.pop("compression", None)
@@ -611,10 +609,16 @@ class _FileBasedDatasourceReader(Reader):
                 file_sizes=file_sizes,
             )
 
+            def do_read():
+                logger.get_logger().debug(f"Reading {len(read_paths)} files.")
+                yield from make_async_gen(
+                    iter(read_paths),
+                    functools.partial(read_files, fs=filesystem),
+                    num_workers=8,
+                )
 
-            read_task = ReadTask(
-                lambda read_paths=read_paths: make_async_gen(read_paths, functools.partial(read_paths, fs=filesystem)), meta
-            )
+            read_task = ReadTask(do_read, meta)
+
             read_tasks.append(read_task)
 
         return read_tasks
@@ -899,7 +903,6 @@ def _unwrap_arrow_serialization_workaround(kwargs: dict) -> dict:
 def _resolve_kwargs(
     kwargs_fn: Callable[[], Dict[str, Any]], **kwargs
 ) -> Dict[str, Any]:
-
     if kwargs_fn:
         kwarg_overrides = kwargs_fn()
         kwargs.update(kwarg_overrides)
