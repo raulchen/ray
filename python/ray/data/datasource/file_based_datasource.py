@@ -55,7 +55,7 @@ logger = DatasetLogger(__name__)
 
 
 # We should parallelize file size fetch operations beyond this threshold.
-FILE_SIZE_FETCH_PARALLELIZATION_THRESHOLD = 160
+FILE_SIZE_FETCH_PARALLELIZATION_THRESHOLD = 1600
 
 # 16 file size fetches from S3 takes ~1.5 seconds with Arrow's S3FileSystem.
 PATHS_PER_FILE_SIZE_FETCH_TASK = 16
