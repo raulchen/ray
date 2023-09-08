@@ -26,11 +26,11 @@ from ray.data._internal.dataset_logger import DatasetLogger
 from ray.data._internal.execution.interfaces import TaskContext
 from ray.data._internal.progress_bar import ProgressBar
 from ray.data._internal.remote_fn import cached_remote_fn
+from ray.data._internal.block_batching.util import make_async_gen
 from ray.data._internal.util import (
     _check_pyarrow_version,
     _resolve_custom_scheme,
     get_attribute_from_class_name,
-    make_async_gen,
 )
 from ray.data.block import Block, BlockAccessor
 from ray.data.context import DataContext
@@ -55,7 +55,7 @@ logger = DatasetLogger(__name__)
 
 
 # We should parallelize file size fetch operations beyond this threshold.
-FILE_SIZE_FETCH_PARALLELIZATION_THRESHOLD = 16
+FILE_SIZE_FETCH_PARALLELIZATION_THRESHOLD = 160
 
 # 16 file size fetches from S3 takes ~1.5 seconds with Arrow's S3FileSystem.
 PATHS_PER_FILE_SIZE_FETCH_TASK = 16
@@ -229,7 +229,7 @@ class FileBasedDatasource(Datasource):
     _FILE_EXTENSION: Optional[Union[str, List[str]]] = None
     # Number of threads for concurrent reading within each read task.
     # If zero or negative, reading will be performed in the main thread.
-    _NUM_THREADS_PER_TASK = 0
+    _NUM_THREADS_PER_TASK = 8
 
     def _open_input_source(
         self,
