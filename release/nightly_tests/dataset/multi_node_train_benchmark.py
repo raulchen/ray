@@ -12,7 +12,7 @@ import math
 from benchmark import Benchmark, BenchmarkMetric
 
 from PIL import Image
-from image_loader_microbenchmark import get_mosaic_dataloader
+# from image_loader_microbenchmark import get_mosaic_dataloader
 
 
 import time
@@ -232,13 +232,13 @@ def train_loop_per_worker():
         # Divide by the number of Train workers because each has its own dataloader.
         torch_num_workers //= ray.train.get_context().get_local_world_size()
 
-        batch_iter = get_mosaic_dataloader(
-            args.data_root,
-            batch_size=args.batch_size,
-            num_physical_nodes=num_physical_nodes,
-            epoch_size=target_epoch_size,
-            num_workers=torch_num_workers,
-        )
+        # batch_iter = get_mosaic_dataloader(
+        #     args.data_root,
+        #     batch_size=args.batch_size,
+        #     num_physical_nodes=num_physical_nodes,
+        #     epoch_size=target_epoch_size,
+        #     num_workers=torch_num_workers,
+        # )
 
     for i in range(args.num_epochs):
         print(f"Epoch {i+1} of {args.num_epochs}")
