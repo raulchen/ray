@@ -64,11 +64,12 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
             "_generator_backpressure_num_objects"
         ] = (2 * self._max_num_blocks_in_streaming_gen_buffer)
 
-        self._max_num_blocks_in_op_output_queue = data_context.get_config(
+        self._max_op_output_queue_size_bytes = data_context.get_config(
             self.MAX_BLOCKS_IN_OP_OUTPUT_QUEUE_CONFIG_KEY,
             self.MAX_BLOCKS_IN_OP_OUTPUT_QUEUE,
         )
-        assert self._max_num_blocks_in_op_output_queue > 0
+        self._max_op_output_queue_size_bytes = 2 * 1024 ** 3
+        assert self._max_op_output_queue_size_bytes > 0
 
         # Latest number of outputs and the last time when the number changed
         # for each op.
@@ -77,22 +78,22 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
         ] = defaultdict(lambda: (0, time.time()))
         self._warning_printed = False
 
-    def calculate_max_blocks_to_read_per_op(
+    def calculate_max_bytes_to_read_per_op(
         self, topology: "Topology"
     ) -> Dict["OpState", int]:
-        max_blocks_to_read_per_op: Dict["OpState", int] = {}
+        max_bytes_to_read_per_op: Dict["OpState", int] = {}
 
         # Indicates if the immediate downstream operator is idle.
         downstream_idle = False
 
         for op, state in reversed(topology.items()):
-            max_blocks_to_read_per_op[state] = (
-                self._max_num_blocks_in_op_output_queue - state.outqueue_num_blocks()
+            max_bytes_to_read_per_op[state] = (
+                self._max_op_output_queue_size_bytes - state.outqueue_memory_usage()
             )
 
             if downstream_idle:
-                max_blocks_to_read_per_op[state] = max(
-                    max_blocks_to_read_per_op[state],
+                max_bytes_to_read_per_op[state] = max(
+                    max_bytes_to_read_per_op[state],
                     1,
                 )
 
@@ -129,7 +130,7 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
                     if cur_time - last_time > self.MAX_OUTPUT_IDLE_SECONDS:
                         downstream_idle = True
                         self._print_warning(state.op, cur_time - last_time)
-        return max_blocks_to_read_per_op
+        return max_bytes_to_read_per_op
 
     def _print_warning(self, op: "PhysicalOperator", idle_time: float):
         if self._warning_printed:

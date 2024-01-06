@@ -15,7 +15,7 @@ class BackpressurePolicy(ABC):
     def __init__(self, topology: "Topology"):
         ...
 
-    def calculate_max_blocks_to_read_per_op(
+    def calculate_max_bytes_to_read_per_op(
         self, topology: "Topology"
     ) -> Dict["OpState", int]:
         """Determine how many blocks of data we can read from each operator.
