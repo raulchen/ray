@@ -203,7 +203,7 @@ class DataContext:
         write_file_retry_on_errors: List[str],
     ):
         """Private constructor (use get_current() instead)."""
-        self.target_max_block_size = target_max_block_size
+        self.target_max_block_size: int = target_max_block_size
         self.target_shuffle_max_block_size = target_shuffle_max_block_size
         self.target_min_block_size = target_min_block_size
         self.streaming_read_buffer_size = streaming_read_buffer_size

@@ -253,20 +253,20 @@ class StreamingExecutor(Executor, threading.Thread):
 
         if DEBUG_TRACE_SCHEDULING:
             logger.get_logger().info("Scheduling loop step...")
+        limits = self._get_or_refresh_resource_limits()
+        cur_usage = TopologyResourceUsage.of(topology)
 
         # Note: calling process_completed_tasks() is expensive since it incurs
         # ray.wait() overhead, so make sure to allow multiple dispatch per call for
         # greater parallelism.
         num_errored_blocks = process_completed_tasks(
-            topology, self._backpressure_policies, self._max_errored_blocks
+            topology, cur_usage, limits, self._backpressure_policies, self._max_errored_blocks
         )
         if self._max_errored_blocks > 0:
             self._max_errored_blocks -= num_errored_blocks
         self._num_errored_blocks += num_errored_blocks
 
         # Dispatch as many operators as we can for completed tasks.
-        limits = self._get_or_refresh_resource_limits()
-        cur_usage = TopologyResourceUsage.of(topology)
         self._report_current_usage(cur_usage, limits)
         op = select_operator_to_run(
             topology,

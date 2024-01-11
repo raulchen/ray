@@ -191,6 +191,13 @@ class OpRuntimeMetrics:
 
         return self.average_bytes_outputs_per_task - self.average_bytes_inputs_per_task
 
+    def average_block_size_bytes(self) -> Optional[float]:
+        """Average size in bytes of output blocks."""
+        if self.num_outputs_generated == 0:
+            return None
+        else:
+            return self.bytes_outputs_generated / self.num_outputs_generated
+
     @property
     def input_buffer_bytes(self) -> int:
         """Size in bytes of input blocks that are not processed yet."""

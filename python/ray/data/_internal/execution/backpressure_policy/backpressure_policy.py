@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Dict
 
+from ray.data._internal.execution.interfaces.execution_options import ExecutionResources
+
 if TYPE_CHECKING:
     from ray.data._internal.execution.interfaces.physical_operator import (
         PhysicalOperator,
@@ -16,7 +18,10 @@ class BackpressurePolicy(ABC):
         ...
 
     def calculate_max_bytes_to_read_per_op(
-        self, topology: "Topology"
+        self,
+        topology: "Topology",
+        cur_usage: ExecutionResources,
+        limits: ExecutionResources,
     ) -> Dict["OpState", int]:
         """Determine how many blocks of data we can read from each operator.
         The `DataOpTask`s of the operators will stop reading blocks when the limit is

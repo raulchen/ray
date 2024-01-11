@@ -5,10 +5,15 @@ from typing import TYPE_CHECKING, Dict, Tuple
 import ray
 from .backpressure_policy import BackpressurePolicy
 from ray.data._internal.dataset_logger import DatasetLogger
+from ray.data._internal.execution.interfaces.execution_options import ExecutionResources
 
 if TYPE_CHECKING:
     from ray.data._internal.execution.interfaces import PhysicalOperator
-    from ray.data._internal.execution.streaming_executor_state import OpState, Topology
+    from ray.data._internal.execution.streaming_executor_state import (
+        OpState,
+        Topology,
+        TopologyResourceUsage,
+    )
 
 
 logger = DatasetLogger(__name__)
@@ -52,6 +57,7 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
 
     def __init__(self, topology: "Topology"):
         data_context = ray.data.DataContext.get_current()
+        self._data_context = data_context
         self._max_num_blocks_in_streaming_gen_buffer = data_context.get_config(
             self.MAX_BLOCKS_IN_GENERATOR_BUFFER_CONFIG_KEY,
             self.MAX_BLOCKS_IN_GENERATOR_BUFFER,
@@ -66,10 +72,8 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
 
         self._max_op_output_queue_size_bytes = data_context.get_config(
             self.MAX_BLOCKS_IN_OP_OUTPUT_QUEUE_CONFIG_KEY,
-            self.MAX_BLOCKS_IN_OP_OUTPUT_QUEUE,
+            None,
         )
-        self._max_op_output_queue_size_bytes = 2 * 1024 ** 3
-        assert self._max_op_output_queue_size_bytes > 0
 
         # Latest number of outputs and the last time when the number changed
         # for each op.
@@ -79,17 +83,47 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
         self._warning_printed = False
 
     def calculate_max_bytes_to_read_per_op(
-        self, topology: "Topology"
+        self,
+        topology: "Topology",
+        cur_usage: ExecutionResources,
+        limits: ExecutionResources,
     ) -> Dict["OpState", int]:
+        # Calcuate the available object store memory.
+        assert limits.object_store_memory is not None
+        assert cur_usage.object_store_memory is not None
+        avail_object_store_memory = limits.object_store_memory
+        # Subtract current the memory usage of the dataset.
+        avail_object_store_memory -= cur_usage.object_store_memory
+        # Subtract the memory usage of the blocks pending at streaming generator level.
+        for op, state in topology.items():
+            op_metrics = op.metrics
+            avg_block_size_bytes: float = (
+                op_metrics.average_block_size_bytes()
+                or self._data_context.target_max_block_size
+            )
+            avail_object_store_memory -= (
+                op_metrics.num_tasks_running
+                * avg_block_size_bytes
+                * self._max_num_blocks_in_streaming_gen_buffer
+            )
+        avail_object_store_memory = max(avail_object_store_memory, 0)
+
         max_bytes_to_read_per_op: Dict["OpState", int] = {}
 
         # Indicates if the immediate downstream operator is idle.
         downstream_idle = False
 
         for op, state in reversed(topology.items()):
-            max_bytes_to_read_per_op[state] = (
-                self._max_op_output_queue_size_bytes - state.outqueue_memory_usage()
-            )
+            if self._max_op_output_queue_size_bytes is None:
+                # Assign available object store memory evenly to each operator.
+                max_bytes_to_read_per_op[state] = int(
+                    avail_object_store_memory / len(topology)
+                )
+            else:
+                max_bytes_to_read_per_op[state] = (
+                    self._max_op_output_queue_size_bytes
+                    - state.outqueue_memory_usage()
+                )
 
             if downstream_idle:
                 max_bytes_to_read_per_op[state] = max(
