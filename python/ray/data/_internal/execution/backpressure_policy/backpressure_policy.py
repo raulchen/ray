@@ -23,13 +23,18 @@ class BackpressurePolicy(ABC):
         cur_usage: ExecutionResources,
         limits: ExecutionResources,
     ) -> Dict["OpState", int]:
-        """Determine how many blocks of data we can read from each operator.
+        """Determine how many bytes of blocks we can read from each operator.
         The `DataOpTask`s of the operators will stop reading blocks when the limit is
         reached. Then the execution of these tasks will be paused when the streaming
         generator backpressure threshold is reached.
         Used in `streaming_executor_state.py::process_completed_tasks()`.
 
-        Returns: A dict mapping from each operator's OpState to the desired number of
+        Args:
+            topology: The topology of the dataset.
+            cur_usage: The current resource usage of the dataset.
+            limits: The resource limits of the dataset.
+
+        Returns: A dict mapping from each operator's OpState to the desired bytes of
             blocks to read. For operators that are not in the dict, all available blocks
             will be read.
 

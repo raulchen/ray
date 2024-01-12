@@ -407,12 +407,14 @@ def process_completed_tasks(
 
     max_bytes_to_read_per_op: Dict[OpState, int] = {}
     for policy in backpressure_policies:
-        res = policy.calculate_max_bytes_to_read_per_op(topology, cur_usage.overall, limits)
+        res = policy.calculate_max_bytes_to_read_per_op(
+            topology, cur_usage.overall, limits
+        )
         if len(res) > 0:
             if len(max_bytes_to_read_per_op) > 0:
                 raise ValueError(
                     "At most one backpressure policy that implements "
-                    "calculate_max_blocks_to_read_per_op() can be used at a time."
+                    "calculate_max_bytes_to_read_per_op() can be used at a time."
                 )
             else:
                 max_bytes_to_read_per_op = res
