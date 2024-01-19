@@ -3,6 +3,8 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Dict, Tuple
 
 import ray
+
+from ray._private.worker import wait
 from .backpressure_policy import BackpressurePolicy
 from ray.data._internal.dataset_logger import DatasetLogger
 from ray.data._internal.execution.interfaces.execution_options import ExecutionResources
@@ -91,21 +93,27 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
         # Calcuate the available object store memory.
         assert limits.object_store_memory is not None
         assert cur_usage.object_store_memory is not None
-        avail_object_store_memory = limits.object_store_memory
-        # Subtract current the memory usage of the dataset.
-        avail_object_store_memory -= cur_usage.object_store_memory
-        # Subtract the memory usage of the blocks pending at streaming generator level.
+
+        op_usages = {}
         for op, state in topology.items():
             op_metrics = op.metrics
             avg_block_size_bytes: float = (
                 op_metrics.average_block_size_bytes()
                 or self._data_context.target_max_block_size
             )
-            avail_object_store_memory -= (
+            op_usage = state.outqueue_memory_usage()
+            op_usage += op_metrics.obj_store_mem_cur
+            op_usage += (
                 op_metrics.num_tasks_running
                 * avg_block_size_bytes
                 * self._max_num_blocks_in_streaming_gen_buffer
             )
+            op_usages[state] = op_usage
+
+        avail_object_store_memory = limits.object_store_memory // 2
+        for state, usage in op_usages.items():
+            avail_object_store_memory -= usage - limits.object_store_memory // (2 * len(topology))
+
         avail_object_store_memory = max(avail_object_store_memory, 0)
 
         max_bytes_to_read_per_op: Dict["OpState", int] = {}
@@ -117,6 +125,7 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
             if self._max_op_output_queue_size_bytes is None:
                 # Assign available object store memory evenly to each operator.
                 max_bytes_to_read_per_op[state] = int(
+                    limits.object_store_memory / len(topology) / 2 - op_usages[state] +
                     avail_object_store_memory / len(topology)
                 )
             else:
@@ -164,6 +173,8 @@ class StreamingOutputBackpressurePolicy(BackpressurePolicy):
                     if cur_time - last_time > self.MAX_OUTPUT_IDLE_SECONDS:
                         downstream_idle = True
                         self._print_warning(state.op, cur_time - last_time)
+        for state in max_bytes_to_read_per_op:
+            print(state, max_bytes_to_read_per_op[state], op_usages[state])
         return max_bytes_to_read_per_op
 
     def _print_warning(self, op: "PhysicalOperator", idle_time: float):
