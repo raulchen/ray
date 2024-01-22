@@ -35,7 +35,7 @@ class LimitOperator(OneToOneOperator):
         return self._consumed_rows >= self._limit
 
     def need_more_inputs(self) -> bool:
-        return not self._limit_reached()
+        return not self._limit_reached() and not self._dependents_complete
 
     def _add_input_inner(self, refs: RefBundle, input_index: int) -> None:
         assert not self.completed()
@@ -71,6 +71,7 @@ class LimitOperator(OneToOneOperator):
                 out_metadata.append(metadata)
                 self._output_metadata.append(metadata)
                 self._consumed_rows = self._limit
+                print("reached limit")
                 break
         self._cur_output_bundles += 1
         out_refs = RefBundle(
@@ -116,3 +117,6 @@ class LimitOperator(OneToOneOperator):
             return self._estimated_output_blocks
         else:
             return self.input_dependencies[0].num_outputs_total()
+
+    def throttling_disabled(self) -> bool:
+        return True

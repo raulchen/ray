@@ -519,11 +519,12 @@ def update_operator_states(topology: Topology) -> None:
         if op_state.dependents_completed_called:
             continue
         dependents_completed = len(op.output_dependencies) > 0 and all(
-            not dep.need_more_inputs() for dep in op.output_dependencies
+            (not dep.need_more_inputs() or op.completed()) for dep in op.output_dependencies
         )
         if dependents_completed:
             op.all_dependents_complete()
             op_state.dependents_completed_called = True
+            # print("dependents_completed", op.name, op.completed())
 
 
 def select_operator_to_run(
@@ -597,13 +598,15 @@ def select_operator_to_run(
 
     # Run metadata-only operators first. After that, equally penalize outqueue length
     # and num bundles processing for backpressure.
-    return min(
+    res = min(
         ops,
         key=lambda op: (
             not op.throttling_disabled(),
             len(topology[op].outqueue) + topology[op].num_processing(),
         ),
     )
+    # print("selected op", res.name, "runnable ops", [op.name for op in ops])
+    return res
 
 
 def _try_to_scale_up_cluster(topology: Topology, execution_id: str):

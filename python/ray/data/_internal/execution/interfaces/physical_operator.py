@@ -291,7 +291,6 @@ class PhysicalOperator(Operator):
                 input. For most operators, this is always `0` since there is only
                 one upstream input operator.
         """
-        self._metrics.on_input_received(refs)
         self._add_input_inner(refs, input_index)
 
     def _add_input_inner(self, refs: RefBundle, input_index: int) -> None:

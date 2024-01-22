@@ -224,6 +224,7 @@ class MapOperator(OneToOneOperator, ABC):
     def _add_input_inner(self, refs: RefBundle, input_index: int):
         assert input_index == 0, input_index
         # Add RefBundle to the bundler.
+        self._metrics.on_input_received(refs)
         self._block_ref_bundler.add_bundle(refs)
         if self._block_ref_bundler.has_bundle():
             # If the bundler has a full bundle, add it to the operator's task submission
