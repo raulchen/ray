@@ -195,6 +195,7 @@ class OpState:
         # Used for StreamingExecutor to signal exception or end of execution
         self._finished: bool = False
         self._exception: Optional[Exception] = None
+        self._last_dump_time: float = time.time()
 
     def __repr__(self):
         return f"OpState({self.op.name})"
@@ -303,6 +304,10 @@ class OpState:
                 # we find one or hit a None.
             except IndexError:
                 pass
+
+            if time.time() > self._last_dump_time + 5:
+                self._last_dump_time = time.time()
+                print("current index": output_split_idx, "output queue:", [b.output_split_idx for b in self.outqueue]))
             time.sleep(0.01)
 
     def inqueue_memory_usage(self) -> int:
