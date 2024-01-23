@@ -307,7 +307,7 @@ class OpState:
 
             if time.time() > self._last_dump_time + 5:
                 self._last_dump_time = time.time()
-                print("current index": output_split_idx, "output queue:", [b.output_split_idx for b in self.outqueue]))
+                print("current index", output_split_idx, "output queue:", [b.output_split_idx for b in self.outqueue])
             time.sleep(0.01)
 
     def inqueue_memory_usage(self) -> int:
