@@ -106,12 +106,13 @@ class DownstreamMemoryInfo:
     object_store_memory: float
 
 
-class RefBundleDeque(deque):
+class RefBundleDeque:
     """Thread-safe wrapper around collections.deque that stores current stats."""
 
     def __init__(self):
         self._memory_usage = 0
         self._num_blocks = 0
+        self._queues = defaultdict(lambda: deque())
         self._lock = threading.Lock()
         super().__init__()
 
@@ -125,43 +126,27 @@ class RefBundleDeque(deque):
         with self._lock:
             return self._num_blocks
 
+    def __len__(self):
+        with self._lock:
+            return self._num_blocks
+
     def append(self, ref: RefBundle):
         with self._lock:
             self._memory_usage += ref.size_bytes()
             self._num_blocks += len(ref.blocks)
-        super().append(ref)
+            idx = ref.output_split_idx
+            if idx is None:
+                idx = -1
+            self._queues[idx].append(ref)
 
-    def appendleft(self, ref: RefBundle):
-        with self._lock:
-            self._memory_usage += ref.size_bytes()
-            self._num_blocks += len(ref.blocks)
-        super().appendleft(ref)
-
-    def pop(self) -> RefBundle:
-        ref = super().pop()
-        with self._lock:
-            self._memory_usage -= ref.size_bytes()
-            self._num_blocks -= len(ref.blocks)
-        return ref
-
-    def popleft(self) -> RefBundle:
-        ref = super().popleft()
+    def pop(self, output_split_idx=None) -> RefBundle:
+        if output_split_idx is None:
+            output_split_idx = -1
+        ref = self._queues[output_split_idx].popleft()
         with self._lock:
             self._memory_usage -= ref.size_bytes()
             self._num_blocks -= len(ref.blocks)
         return ref
-
-    def remove(self, ref: RefBundle):
-        super().remove(ref)
-        with self._lock:
-            self._memory_usage -= ref.size_bytes()
-            self._num_blocks -= len(ref.blocks)
-
-    def clear(self):
-        super().clear()
-        with self._lock:
-            self._memory_usage = 0
-            self._num_blocks = 0
 
 
 class OpState:
@@ -268,7 +253,7 @@ class OpState:
         """Move a bundle from the operator inqueue to the operator itself."""
         for i, inqueue in enumerate(self.inqueues):
             if inqueue:
-                self.op.add_input(inqueue.popleft(), input_index=i)
+                self.op.add_input(inqueue.pop(), input_index=i)
                 return
         assert False, "Nothing to dispatch"
 
@@ -289,25 +274,13 @@ class OpState:
             elif self._finished and len(self.outqueue) == 0:
                 raise StopIteration()
             try:
-                # Non-split output case.
-                if output_split_idx is None:
-                    return self.outqueue.popleft()
-
-                # Scan the queue and look for outputs tagged for the given index.
-                for i in range(len(self.outqueue)):
-                    bundle = self.outqueue[i]
-                    if bundle.output_split_idx == output_split_idx:
-                        self.outqueue.remove(bundle)
-                        return bundle
-
-                # Didn't find any outputs matching this index, repeat the loop until
-                # we find one or hit a None.
+                return self.outqueue.pop(output_split_idx)
             except IndexError:
                 pass
 
             if time.time() > self._last_dump_time + 5:
                 self._last_dump_time = time.time()
-                print("current index", output_split_idx, "output queue:", [b.output_split_idx for b in self.outqueue])
+                print("current index", output_split_idx, "output queue:", [(k, len(v)) for k, v in self.outqueue._queues.items()])
             time.sleep(0.01)
 
     def inqueue_memory_usage(self) -> int:
