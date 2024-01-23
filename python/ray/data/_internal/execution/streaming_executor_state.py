@@ -144,7 +144,7 @@ class RefBundleDeque:
         if output_split_idx is None:
             output_split_idx = -1
         ref = self._queues[output_split_idx].popleft()
-        self._num_consumed[output_split_idx] += 1
+        self._num_consumed[output_split_idx] += len(ref.blocks)
         with self._lock:
             self._memory_usage -= ref.size_bytes()
             self._num_blocks -= len(ref.blocks)
@@ -269,11 +269,13 @@ class OpState:
             StopIteration: If all outputs are already consumed.
             Exception: If there was an exception raised during execution.
         """
+        if output_split_idx is None:
+            output_split_idx = -1
         while True:
             # Check if StreamingExecutor has caught an exception or is done execution.
             if self._exception is not None:
                 raise self._exception
-            elif self._finished and len(self.outqueue) == 0:
+            elif self._finished and len(self.outqueue._queues[output_split_idx]) == 0:
                 raise StopIteration()
             try:
                 return self.outqueue.pop(output_split_idx)
