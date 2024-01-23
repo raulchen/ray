@@ -113,6 +113,7 @@ class RefBundleDeque:
         self._memory_usage = 0
         self._num_blocks = 0
         self._queues = defaultdict(lambda: deque())
+        self._num_consumed = defaultdict(lambda: 0)
         self._lock = threading.Lock()
         super().__init__()
 
@@ -143,6 +144,7 @@ class RefBundleDeque:
         if output_split_idx is None:
             output_split_idx = -1
         ref = self._queues[output_split_idx].popleft()
+        self._num_consumed[output_split_idx] += 1
         with self._lock:
             self._memory_usage -= ref.size_bytes()
             self._num_blocks -= len(ref.blocks)
@@ -280,7 +282,15 @@ class OpState:
 
             if time.time() > self._last_dump_time + 5:
                 self._last_dump_time = time.time()
-                print("current index", output_split_idx, "output queue:", [(k, len(v)) for k, v in self.outqueue._queues.items()])
+                print(
+                    "current index",
+                    output_split_idx,
+                    "output queue:",
+                    [
+                        (k, len(self.outqueue._queues[k]), self.outqueue._num_consumed)
+                        for k in sorted(self.outqueue._queues)
+                    ],
+                )
             time.sleep(0.01)
 
     def inqueue_memory_usage(self) -> int:
