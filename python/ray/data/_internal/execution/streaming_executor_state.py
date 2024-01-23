@@ -287,7 +287,7 @@ class OpState:
                     output_split_idx,
                     "output queue:",
                     [
-                        (k, len(self.outqueue._queues[k]), self.outqueue._num_consumed)
+                        (k, len(self.outqueue._queues[k]), self.outqueue._num_consumed[k])
                         for k in sorted(self.outqueue._queues)
                     ],
                 )
