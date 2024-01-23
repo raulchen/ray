@@ -287,6 +287,9 @@ class OpState:
                 print(
                     "current index",
                     output_split_idx,
+                    "finished?",
+                    self._finished,
+                    self._exception,
                     "output queue:",
                     [
                         (k, len(self.outqueue._queues[k]), self.outqueue._num_consumed[k])
