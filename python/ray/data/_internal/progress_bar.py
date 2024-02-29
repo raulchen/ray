@@ -1,3 +1,4 @@
+import shutil
 import threading
 from typing import Any, List, Optional
 
@@ -104,9 +105,20 @@ class ProgressBar:
 
         return [ref_to_result[ref] for ref in refs]
 
-    def set_description(self, name: str) -> None:
-        if self._bar and name != self._desc:
-            self._desc = name
+    def _trim_description(self, desc):
+        terminal_width = shutil.get_terminal_size().columns
+        max_desc_width = terminal_width - 30
+        # Trim the description if it's too long
+        if len(desc) > max_desc_width:
+            trimmed_desc = desc[: max_desc_width - 3] + "..."
+        else:
+            trimmed_desc = desc
+        return trimmed_desc
+
+    def set_description(self, desc: str) -> None:
+        desc = self._trim_description(desc)
+        if self._bar and desc != self._desc:
+            self._desc = desc
             self._bar.set_description(self._desc)
 
     def update(self, i: int = 0, total: Optional[int] = None) -> None:
