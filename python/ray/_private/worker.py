@@ -2091,8 +2091,9 @@ def process_tqdm(line):
     try:
         data = json.loads(line)
         tqdm_ray.instance().process_state_update(data)
-    except Exception:
+    except Exception as e:
         if log_once("tqdm_corruption"):
+            print(e)
             logger.warning(
                 f"[tqdm_ray] Failed to decode {line}, this may be due to "
                 "logging too fast. This warning will not be printed again."

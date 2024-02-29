@@ -292,8 +292,20 @@ class _BarManager:
         created or destroyed, we also recalculate and update the `pos_offset` of each
         BarGroup on the screen.
         """
+        state["desc"] = self._trim_description(state["desc"])
         with self.lock:
             self._process_state_update_locked(state)
+
+    def _trim_description(self, desc):
+        import shutil
+        terminal_width = shutil.get_terminal_size().columns
+        max_desc_width = max(terminal_width - 50, 3)
+        # Trim the description if it's too long
+        if len(desc) > max_desc_width:
+            trimmed_desc = desc[: max_desc_width - 3] + "..."
+        else:
+            trimmed_desc = desc
+        return trimmed_desc
 
     def _process_state_update_locked(self, state: ProgressBarState) -> None:
         if not real_tqdm:
