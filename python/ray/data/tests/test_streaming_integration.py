@@ -568,7 +568,27 @@ def test_can_pickle(ray_start_10_cpus_shared, restore_data_context):
     assert ds2.count() == 1000000
 
 
-def test_streaming_fault_tolerance(ray_start_10_cpus_shared, restore_data_context):
+def test_task_map_fault_tolerance(ray_start_10_cpus_shared, restore_data_context):
+    def random_exit(x):
+        import os
+
+        if random.random() > 0.9:
+            print("force exit")
+            os._exit(1)
+        return x
+
+    # Test recover.
+    base = ray.data.range(1000, override_num_blocks=100)
+    ds1 = base.map_batches(random_exit)
+    ds1.take_all()
+
+    # Test disabling fault tolerance.
+    ds2 = base.map_batches(random_exit, max_retries=0)
+    with pytest.raises(ray.exceptions.WorkerCrashedError):
+        ds2.take_all()
+
+
+def test_actor_map_fault_tolerance(ray_start_10_cpus_shared, restore_data_context):
     class RandomExit:
         def __call__(self, x):
             import os
